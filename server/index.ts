@@ -3,7 +3,7 @@ import express from "express"
 import { Server as IOServer } from "socket.io"
 import { createServer } from "http"
 import next from "next"
-import { SOCKET_EVENTS } from "../consts/index"
+import { SOCKET_EVENTS } from "../src/consts/index"
 
 const app = express()
 const server = createServer(app)

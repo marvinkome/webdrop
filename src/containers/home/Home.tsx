@@ -1,18 +1,12 @@
-import Head from "next/head"
-import styles from "../styles/home.module.scss"
+import styles from "./home.module.scss"
 import { Header } from "components/Header"
 import { Footer } from "components/Footer"
 import { Circles } from "components/Circles"
 import { User, Peer } from "components/Users"
 
-export default function Home() {
+export function HomePage() {
     return (
-        <main className={styles.container}>
-            <Head>
-                <title>Webdrop</title>
-                <link rel="icon" href="/favicon.ico" />
-            </Head>
-
+        <>
             <Header />
 
             <section className={styles.body}>
@@ -28,6 +22,6 @@ export default function Home() {
             </section>
 
             <Footer />
-        </main>
+        </>
     )
 }
