@@ -1,36 +1,17 @@
 import os from "os"
 import express from "express"
-import { Server as IOServer } from "socket.io"
 import { createServer } from "http"
 import next from "next"
-import { SOCKET_EVENTS } from "../src/consts/index"
+import { handleSockets } from "./sockets"
 
 const app = express()
 const server = createServer(app)
-const io = new IOServer(server)
 
 const dev = process.env.NODE_ENV !== "production"
 const nextApp = next({ dev })
 const handle = nextApp.getRequestHandler()
 
-const activeSockets: string[] = []
-io.on("connection", (socket) => {
-    console.log("Socket Connected")
-
-    const alreadyConnected = activeSockets.includes(socket.id)
-    if (!alreadyConnected) {
-        activeSockets.push(socket.id)
-
-        socket.emit(SOCKET_EVENTS.UPDATE_USER_LIST, {
-            users: activeSockets.filter((user) => user !== socket.id),
-        })
-
-        socket.broadcast.emit(SOCKET_EVENTS.UPDATE_USER_LIST, {
-            users: [socket.id],
-        })
-    }
-})
-
+handleSockets(server)
 nextApp.prepare().then(() => {
     app.get("*", (req, res) => {
         return handle(req, res)

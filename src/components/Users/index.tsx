@@ -1,20 +1,20 @@
 import styles from "./styles.module.scss"
 
-export function User() {
+export function User({ avatar, name }: { avatar: string; name: string }) {
     return (
         <div className={styles.userAvatar}>
-            <img src="/avatar1.jpeg" alt="User Avatar" />
-            <span>You</span>
+            <img src={avatar} alt="My Avatar" />
+            <span>{name}</span>
         </div>
     )
 }
 
-export function Peer() {
+export function Peer({ avatar, name }: { avatar: string; name: string }) {
     return (
         <div className={styles.peerAvatar}>
-            <img src="/avatar2.jpeg" alt="Peer Avatar" />
+            <img src={avatar} alt="Peer Avatar" />
 
-            <span>Invincible Kango</span>
+            <span>{name}</span>
         </div>
     )
 }
