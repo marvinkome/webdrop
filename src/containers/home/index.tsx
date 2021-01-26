@@ -27,8 +27,12 @@ export function Home() {
         })
     }, [])
 
+    const onSelectFile = (file?: File) => {
+        console.log(file?.name)
+    }
+
     const me = activeUsers.find((user) => user.id === socketId)
     const peers = activeUsers.filter((user) => user.id !== socketId)
 
-    return <HomePage me={me} peers={peers} />
+    return <HomePage me={me} peers={peers} onSelectFile={onSelectFile} />
 }

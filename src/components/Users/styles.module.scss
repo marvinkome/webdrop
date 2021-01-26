@@ -4,11 +4,12 @@
     position: absolute;
     z-index: 100;
     padding: 5px;
-    margin-bottom: 2em;
+    margin-left: 10px;
+    margin-bottom: 3em;
 
     img {
-        width: 100px;
-        height: 100px;
+        width: 80px;
+        height: 80px;
         object-fit: cover;
         border-radius: 50%;
         border: 5px solid $color2;
@@ -26,6 +27,8 @@
     position: absolute;
     z-index: 100;
     padding: 5px;
+    cursor: pointer;
+
     bottom: 192px;
     margin-left: -296px;
 
@@ -35,6 +38,13 @@
         object-fit: cover;
         border-radius: 50%;
         border: 5px solid $color2;
+        transition: all 0.2s ease-in-out;
+
+        &:hover {
+            width: 80px;
+            height: 80px;
+            margin-bottom: -5px;
+        }
     }
 
     span {
