@@ -33,6 +33,28 @@ export function handleSockets(server: Server) {
             })
         }
 
+        // listeners
+        socket.on(SOCKET_EVENTS.SEND_OFFER, (data: any) => {
+            socket.to(data.to).emit(SOCKET_EVENTS.RECEIVE_OFFER, {
+                offer: data.offer,
+                socketId: socket.id,
+            })
+        })
+
+        socket.on(SOCKET_EVENTS.SEND_ICE_CANDIDATE, (data: any) => {
+            socket.to(data.to).emit(SOCKET_EVENTS.RECEIVE_ICE_CANDIDATE, {
+                ice: data.ice,
+                socketId: socket.id,
+            })
+        })
+
+        socket.on(SOCKET_EVENTS.SEND_ANSWER, (data: any) => {
+            socket.to(data.to).emit(SOCKET_EVENTS.RECEIVE_ANSWER, {
+                answer: data.answer,
+                socketId: socket.id,
+            })
+        })
+
         socket.on("disconnect", () => {
             activeUsers = activeUsers.filter((user) => user.id !== socket.id)
             io.emit(SOCKET_EVENTS.UPDATE_USER_LIST, {

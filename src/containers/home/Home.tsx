@@ -17,7 +17,7 @@ type Props = {
         id: string
     }>
 
-    onSelectFile: (file?: File) => void
+    onSelectFile: (peerId: string, file?: File) => void
 }
 
 export function HomePage(props: Props) {
@@ -29,14 +29,14 @@ export function HomePage(props: Props) {
                 <div className={styles.innerBody}>
                     {props.me && <User avatar={props.me.avatar} name={props.me.name} />}
 
-                    {/* {props.peers?.map(({ id, avatar, name }) => (
-                        <Peer avatar={avatar} name={name} key={id} />
-                    ))} */}
-                    <Peer
-                        avatar={"./avatar2.jpeg"}
-                        name={"Energetic Kango"}
-                        onSelectFile={props.onSelectFile}
-                    />
+                    {props.peers?.map(({ id, avatar, name }) => (
+                        <Peer
+                            avatar={avatar}
+                            name={name}
+                            key={id}
+                            onSelectFile={(file) => props.onSelectFile(id, file)}
+                        />
+                    ))}
 
                     <Circles />
                 </div>
