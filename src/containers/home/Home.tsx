@@ -17,6 +17,8 @@ type Props = {
         id: string
     }>
 
+    connectingPeers: string[]
+    connectedPeers: string[]
     onSelectFile: (peerId: string, file?: File) => void
 }
 
@@ -34,6 +36,8 @@ export function HomePage(props: Props) {
                             avatar={avatar}
                             name={name}
                             key={id}
+                            isConnecting={props.connectingPeers.includes(id)}
+                            isConnected={props.connectedPeers.includes(id)}
                             onSelectFile={(file) => props.onSelectFile(id, file)}
                         />
                     ))}

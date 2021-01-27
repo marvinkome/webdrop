@@ -1,4 +1,5 @@
 import { ChangeEvent, useRef } from "react"
+import cls from "classnames"
 import styles from "./styles.module.scss"
 
 export function User({ avatar, name }: { avatar: string; name: string }) {
@@ -10,8 +11,14 @@ export function User({ avatar, name }: { avatar: string; name: string }) {
     )
 }
 
-type PeerProps = { avatar: string; name: string; onSelectFile: (file?: File) => void }
-export function Peer({ avatar, name, onSelectFile }: PeerProps) {
+type PeerProps = {
+    avatar: string
+    name: string
+    isConnecting: boolean
+    isConnected: boolean
+    onSelectFile: (file?: File) => void
+}
+export function Peer({ avatar, name, onSelectFile, ...props }: PeerProps) {
     const fileInputRef = useRef<HTMLInputElement | null>(null)
     const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         e.stopPropagation()
@@ -24,7 +31,12 @@ export function Peer({ avatar, name, onSelectFile }: PeerProps) {
     }
 
     return (
-        <div className={styles.peerAvatar}>
+        <div
+            className={cls(styles.peerAvatar, {
+                [styles.connecting]: props.isConnecting,
+                [styles.connected]: props.isConnected,
+            })}
+        >
             <img src={avatar} alt="Peer Avatar" onClick={() => onSelectFile()} />
 
             <span>{name}</span>

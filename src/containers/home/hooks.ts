@@ -21,6 +21,10 @@ export function useSocket() {
         socket.on(SOCKET_EVENTS.UPDATE_USER_LIST, (data: any) => {
             setActiveUsers(data.users)
         })
+
+        return () => {
+            socket.disconnect()
+        }
     }, [])
 
     return {
@@ -31,6 +35,8 @@ export function useSocket() {
 
 export function useRTC() {
     const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null)
+    const [connectingPeers, setConnectingPeers] = useState<string[]>([])
+    const [connectedPeers, setConnectedPeers] = useState<string[]>([])
 
     // create peerConnection when component mounts
     useEffect(() => {
@@ -50,7 +56,16 @@ export function useRTC() {
                 await peerConnection?.setLocalDescription(new RTCSessionDescription(answer))
 
                 socket.emit(SOCKET_EVENTS.SEND_ANSWER, { answer, to: data.socketId })
+                setConnectingPeers(connectingPeers.concat(data.socketId))
             }
+
+            peerConnection?.addEventListener("connectionstatechange", () => {
+                if (peerConnection.connectionState === "connected") {
+                    console.log("Peer Connected")
+                    setConnectingPeers(connectingPeers.filter((peer) => peer === data.socketId))
+                    setConnectedPeers(connectedPeers.concat(data.socketId))
+                }
+            })
         })
 
         socket.on(SOCKET_EVENTS.RECEIVE_ICE_CANDIDATE, async (data: any) => {
@@ -60,14 +75,9 @@ export function useRTC() {
         })
     }, [peerConnection])
 
-    // listen to connections and data
+    // handle data receive
     useEffect(() => {
         if (!peerConnection) return
-        peerConnection?.addEventListener("connectionstatechange", (event) => {
-            if (peerConnection.connectionState === "connected") {
-                console.log("Peers connected")
-            }
-        })
 
         // get data channel
         peerConnection?.addEventListener("datachannel", (event) => {
@@ -80,7 +90,7 @@ export function useRTC() {
         })
     }, [peerConnection])
 
-    async function makeCall(socketId: string) {
+    async function makeCall(socketId: string, file?: File) {
         const dataChannel = peerConnection?.createDataChannel("socket-channel")
 
         // handle offers
@@ -89,6 +99,7 @@ export function useRTC() {
 
         // send offer
         socket.emit(SOCKET_EVENTS.SEND_OFFER, { offer, to: socketId })
+        setConnectingPeers(connectingPeers.concat(socketId))
 
         // send ice
         peerConnection?.addEventListener("icecandidate", (event) => {
@@ -107,13 +118,30 @@ export function useRTC() {
             }
         })
 
-        // send data
+        // listen for connection status
+        peerConnection?.addEventListener("connectionstatechange", () => {
+            if (peerConnection.connectionState === "connected") {
+                setConnectingPeers(connectingPeers.filter((peer) => peer === socketId))
+                setConnectedPeers(connectedPeers.concat(socketId))
+            }
+        })
+
+        // send file data
         dataChannel?.addEventListener("open", () => {
             dataChannel.send("Hello world!")
         })
+
+        // close connection
+        // peerConnection?.close()
     }
 
-    return (socketId: string, file?: File) => {
-        makeCall(socketId)
+    return {
+        makeCall,
+        connectingPeers,
+        connectedPeers,
     }
+}
+
+export function useFileUpload() {
+    const [] = useState()
 }
