@@ -165,10 +165,9 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
             setState("uploading")
 
             // update download
-            // const fileReader = handleFileUpload(file, dataChannel, peerConnection)
-            // fileReader.addEventListener("load", (e) => {
-            //     setOffset(offset + (e.target?.result as ArrayBuffer).byteLength)
-            // })
+            handleFileUpload(file, dataChannel, peerConnection, (o) => {
+                setOffset(o)
+            })
         })
     }
 
@@ -178,22 +177,34 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
 
         peerConnection?.addEventListener("datachannel", (event) => {
             const dataChannel = event.channel
+            let transDetails: TransferDetails | null = null
+            let receiveBuffer: any[] = []
+            let localOffset: number = 0
 
             // listen for messages
             dataChannel.addEventListener("message", (e: MessageEvent<any>) => {
                 const caller = dataChannel.label.split("-")[0]
                 const data = e.data
+                setState("downloading")
 
+                // handle file details
                 if (typeof data === "string") {
                     const transferDetails = JSON.parse(data)
                     transferDetails.peerId = caller
 
                     // store file details in state
+                    transDetails = transferDetails
                     setTransferDetails(transferDetails)
-                }
+                } else {
+                    // store file
+                    receiveBuffer.push(data)
+                    localOffset = localOffset + data.byteLength
+                    setOffset(localOffset)
 
-                setState("downloading")
-                console.log(data)
+                    if (localOffset === transDetails?.fileSize) {
+                        console.log("File received")
+                    }
+                }
             })
         })
     }, [peerConnection])

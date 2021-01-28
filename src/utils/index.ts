@@ -86,7 +86,8 @@ export function getUserAvatar() {
 export function handleFileUpload(
     file: File,
     channel: RTCDataChannel,
-    connection: RTCPeerConnection
+    connection: RTCPeerConnection,
+    onload: (offet: number) => void
 ) {
     console.log(`File is ${[file.name, file.size, file.type, file.lastModified].join(" ")}`)
 
@@ -110,10 +111,11 @@ export function handleFileUpload(
     fileReader.addEventListener("error", (error) => console.error("Error reading file:", error))
     fileReader.addEventListener("abort", (event) => console.log("File reading aborted:", event))
     fileReader.addEventListener("load", (e) => {
-        console.log("FileRead.onload ", e)
+        console.log("read complete", e.target?.result)
         channel.send(e.target?.result as string)
-
         offet += (e.target?.result as ArrayBuffer).byteLength
+        onload(offet)
+
         if (offet < file.size) {
             readSlice(offet)
         }
