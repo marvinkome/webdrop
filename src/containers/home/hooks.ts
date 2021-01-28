@@ -56,7 +56,7 @@ export function useRTC() {
         if (!peerConnection) return
 
         // create and store data channel for connection
-        const dataChannel = peerConnection.createDataChannel(`Connection with ${socketId}`)
+        const dataChannel = peerConnection.createDataChannel(`${socket.id}-${socketId}`)
 
         // create offer for receiver
         const offer = await peerConnection.createOffer()
@@ -149,17 +149,17 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
         }
 
         dataChannel.addEventListener("open", () => {
-            // send file details
-            const fileDetails = [file.name, file.size].join(" ")
-            console.log(fileDetails)
-            dataChannel.send(fileDetails)
-
-            // store file details in state
-            setTransferDetails({
+            const transferDetails = {
                 fileName: file.name,
                 fileSize: file.size,
                 peerId,
-            })
+            }
+
+            // send file details
+            dataChannel.send(JSON.stringify(transferDetails))
+
+            // store file details in state
+            setTransferDetails(transferDetails)
 
             // upload file
             setState("uploading")
@@ -176,16 +176,25 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
     useEffect(() => {
         if (!peerConnection) return
 
-        const handleReceivingData = (e: MessageEvent<any>) => {
-            setState("downloading")
-            console.log(e.data)
-        }
-
         peerConnection?.addEventListener("datachannel", (event) => {
             const dataChannel = event.channel
 
             // listen for messages
-            dataChannel.addEventListener("message", handleReceivingData)
+            dataChannel.addEventListener("message", (e: MessageEvent<any>) => {
+                const caller = dataChannel.label.split("-")[0]
+                const data = e.data
+
+                if (typeof data === "string") {
+                    const transferDetails = JSON.parse(data)
+                    transferDetails.peerId = caller
+
+                    // store file details in state
+                    setTransferDetails(transferDetails)
+                }
+
+                setState("downloading")
+                console.log(data)
+            })
         })
     }, [peerConnection])
 
