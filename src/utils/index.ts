@@ -99,12 +99,12 @@ export function handleFileUpload(
     }
 
     const chunkSize = 16384
-    let offet = 0
+    let offset = 0
     let fileReader = new FileReader()
 
     const readSlice = (o: number) => {
         console.log("readSlice: ", o)
-        const slice = file.slice(offet, o + chunkSize)
+        const slice = file.slice(offset, o + chunkSize)
         fileReader.readAsArrayBuffer(slice)
     }
 
@@ -113,11 +113,11 @@ export function handleFileUpload(
     fileReader.addEventListener("load", (e) => {
         console.log("read complete", e.target?.result)
         channel.send(e.target?.result as string)
-        offet += (e.target?.result as ArrayBuffer).byteLength
-        onload(offet)
+        offset += (e.target?.result as ArrayBuffer).byteLength
+        onload(offset)
 
-        if (offet < file.size) {
-            readSlice(offet)
+        if (offset < file.size) {
+            readSlice(offset)
         }
     })
 
@@ -125,6 +125,11 @@ export function handleFileUpload(
     return fileReader
 }
 
-export function handleFileDownload() {
-    // push file to system
+export function dowloadUrl(url: string, name: string) {
+    const a = document.createElement("a")
+
+    a.href = url
+    a.download = name
+
+    a.click()
 }

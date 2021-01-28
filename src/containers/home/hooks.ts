@@ -1,5 +1,5 @@
 import { SOCKET_EVENTS } from "consts"
-import { handleFileUpload } from "utils"
+import { handleFileUpload, dowloadUrl } from "utils"
 import { useEffect, useState } from "react"
 import { io } from "socket.io-client"
 
@@ -195,15 +195,21 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
                     // store file details in state
                     transDetails = transferDetails
                     setTransferDetails(transferDetails)
-                } else {
-                    // store file
-                    receiveBuffer.push(data)
-                    localOffset = localOffset + data.byteLength
-                    setOffset(localOffset)
+                    return
+                }
 
-                    if (localOffset === transDetails?.fileSize) {
-                        console.log("File received")
-                    }
+                // store file
+                receiveBuffer.push(data)
+                localOffset = localOffset + data.byteLength
+                setOffset(localOffset)
+
+                if (localOffset === transDetails?.fileSize) {
+                    const received = new Blob(receiveBuffer)
+                    receiveBuffer = []
+
+                    const url = URL.createObjectURL(received)
+                    dowloadUrl(url, transDetails.fileName)
+                    URL.revokeObjectURL(url)
                 }
             })
         })
