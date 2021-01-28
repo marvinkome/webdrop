@@ -2,24 +2,18 @@ import styles from "./home.module.scss"
 import { Header } from "components/Header"
 import { Footer } from "components/Footer"
 import { Circles } from "components/Circles"
-import { DownloadProgress } from "components/Progress"
+import { Progress } from "components/Progress"
 import { User, Peer } from "components/Users"
+import { User as UserType, TransferDetails } from "./hooks"
 
 type Props = {
-    me?: {
-        avatar: string
-        name: string
-        id: string
-    }
-
-    peers?: Array<{
-        avatar: string
-        name: string
-        id: string
-    }>
-
+    me?: UserType
+    peers?: UserType[]
     connectingPeers: string[]
     connectedPeers: string[]
+    transferDetails: TransferDetails | null
+    fileState: "uploading" | "downloading" | null
+    dataTransferred: number
     onSelectFile: (peerId: string, file?: File) => void
 }
 
@@ -27,7 +21,19 @@ export function HomePage(props: Props) {
     return (
         <>
             <Header />
-            <DownloadProgress />
+
+            {props.transferDetails && (
+                <Progress
+                    fileState={props.fileState}
+                    fileName={props.transferDetails.fileName}
+                    fileSize={props.transferDetails.fileSize}
+                    dataTransferred={props.dataTransferred}
+                    peerName={
+                        props.peers?.find(({ id }) => id === props.transferDetails?.peerId)?.name ||
+                        ""
+                    }
+                />
+            )}
 
             <section className={styles.body}>
                 <div className={styles.innerBody}>
