@@ -1,4 +1,5 @@
 import { SOCKET_EVENTS } from "consts"
+import { handleFileUpload } from "utils"
 import { useEffect, useState } from "react"
 import { io } from "socket.io-client"
 
@@ -61,7 +62,6 @@ export function useRTC() {
 
             peerConnection?.addEventListener("connectionstatechange", () => {
                 if (peerConnection.connectionState === "connected") {
-                    console.log("Peer Connected")
                     setConnectingPeers(connectingPeers.filter((peer) => peer === data.socketId))
                     setConnectedPeers(connectedPeers.concat(data.socketId))
                 }
@@ -91,18 +91,20 @@ export function useRTC() {
     }, [peerConnection])
 
     async function makeCall(socketId: string, file?: File) {
-        const dataChannel = peerConnection?.createDataChannel("socket-channel")
+        if (!file || !peerConnection) return
+
+        const dataChannel = peerConnection.createDataChannel("socket-channel")
 
         // handle offers
-        const offer = await peerConnection?.createOffer()
-        await peerConnection?.setLocalDescription(new RTCSessionDescription(offer))
+        const offer = await peerConnection.createOffer()
+        await peerConnection.setLocalDescription(new RTCSessionDescription(offer))
 
         // send offer
         socket.emit(SOCKET_EVENTS.SEND_OFFER, { offer, to: socketId })
         setConnectingPeers(connectingPeers.concat(socketId))
 
         // send ice
-        peerConnection?.addEventListener("icecandidate", (event) => {
+        peerConnection.addEventListener("icecandidate", (event) => {
             if (event.candidate) {
                 socket.emit(SOCKET_EVENTS.SEND_ICE_CANDIDATE, {
                     ice: event.candidate,
@@ -114,12 +116,12 @@ export function useRTC() {
         // receive offer
         socket.on(SOCKET_EVENTS.RECEIVE_ANSWER, async (data: any) => {
             if (data.answer) {
-                await peerConnection?.setRemoteDescription(new RTCSessionDescription(data.answer))
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
             }
         })
 
         // listen for connection status
-        peerConnection?.addEventListener("connectionstatechange", () => {
+        peerConnection.addEventListener("connectionstatechange", () => {
             if (peerConnection.connectionState === "connected") {
                 setConnectingPeers(connectingPeers.filter((peer) => peer === socketId))
                 setConnectedPeers(connectedPeers.concat(socketId))
@@ -127,12 +129,17 @@ export function useRTC() {
         })
 
         // send file data
-        dataChannel?.addEventListener("open", () => {
-            dataChannel.send("Hello world!")
-        })
+        dataChannel.addEventListener("open", () => {
+            // first send the file details
+            const fileDetails = [file.name, file.size].join(" ")
+            dataChannel.send(fileDetails)
 
-        // close connection
-        // peerConnection?.close()
+            // then upload file
+            const fileReader = handleFileUpload(file, dataChannel, peerConnection)
+            fileReader.addEventListener("loadend", () => {
+                console.log("Upload complete")
+            })
+        })
     }
 
     return {

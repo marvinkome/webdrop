@@ -37,7 +37,7 @@ export function Peer({ avatar, name, onSelectFile, ...props }: PeerProps) {
                 [styles.connected]: props.isConnected,
             })}
         >
-            <img src={avatar} alt="Peer Avatar" onClick={() => onSelectFile()} />
+            <img src={avatar} alt="Peer Avatar" onClick={() => fileInputRef.current?.click()} />
 
             <span>{name}</span>
             <input

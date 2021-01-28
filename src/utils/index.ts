@@ -82,3 +82,47 @@ export function getUserAvatar() {
         label: startCase(`${prefix} ${avatar?.name}`),
     }
 }
+
+export function handleFileUpload(
+    file: File,
+    channel: RTCDataChannel,
+    connection: RTCPeerConnection
+) {
+    console.log(`File is ${[file.name, file.size, file.type, file.lastModified].join(" ")}`)
+
+    if (file.size === 0) {
+        // toast message
+        console.log("File is empty")
+        channel.close()
+        connection.close()
+    }
+
+    const chunkSize = 16384
+    let offet = 0
+    let fileReader = new FileReader()
+
+    const readSlice = (o: number) => {
+        console.log("readSlice: ", o)
+        const slice = file.slice(offet, o + chunkSize)
+        fileReader.readAsArrayBuffer(slice)
+    }
+
+    fileReader.addEventListener("error", (error) => console.error("Error reading file:", error))
+    fileReader.addEventListener("abort", (event) => console.log("File reading aborted:", event))
+    fileReader.addEventListener("load", (e) => {
+        console.log("FileRead.onload ", e)
+        channel.send(e.target?.result as string)
+
+        offet += (e.target?.result as ArrayBuffer).byteLength
+        if (offet < file.size) {
+            readSlice(offet)
+        }
+    })
+
+    readSlice(0)
+    return fileReader
+}
+
+export function handleFileDownload() {
+    // push file to system
+}
