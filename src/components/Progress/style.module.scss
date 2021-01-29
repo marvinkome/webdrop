@@ -8,6 +8,7 @@
     background-color: $color4;
     border: 1px solid $color4;
     overflow: hidden;
+    z-index: 100;
 
     .inner {
         padding: 10px 20px;

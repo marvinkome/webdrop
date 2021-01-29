@@ -69,12 +69,14 @@ export function useRTC() {
         // receive answer from receiver
         socket.on(SOCKET_EVENTS.RECEIVE_ANSWER, async (data: any) => {
             if (data.answer) {
+                console.log("send remote")
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
             }
         })
 
         // send ice candidate to receiver
         peerConnection.addEventListener("icecandidate", (event) => {
+            console.log("send ice", event.candidate)
             if (event.candidate) {
                 socket.emit(SOCKET_EVENTS.SEND_ICE_CANDIDATE, {
                     ice: event.candidate,
@@ -83,8 +85,16 @@ export function useRTC() {
             }
         })
 
+        // receive ice candidate from receiver
+        socket.on(SOCKET_EVENTS.RECEIVE_ICE_CANDIDATE, async (data: any) => {
+            if (data.ice) {
+                peerConnection?.addIceCandidate(data.ice)
+            }
+        })
+
         // mark peer as connected when connection status changes
         peerConnection.addEventListener("connectionstatechange", () => {
+            console.log("connection", peerConnection.connectionState)
             if (peerConnection.connectionState === "connected") {
                 setConnectingPeers(connectingPeers.filter((peer) => peer === socketId))
                 setConnectedPeers(connectedPeers.concat(socketId))
@@ -112,6 +122,17 @@ export function useRTC() {
                 setConnectingPeers(connectingPeers.concat(data.socketId))
             }
 
+            // send ice candidate to caller
+            peerConnection.addEventListener("icecandidate", (event) => {
+                console.log("send ice", event.candidate)
+                if (event.candidate) {
+                    socket.emit(SOCKET_EVENTS.SEND_ICE_CANDIDATE, {
+                        ice: event.candidate,
+                        to: data.socketId,
+                    })
+                }
+            })
+
             // mark peer as connected when connection status changes
             peerConnection?.addEventListener("connectionstatechange", () => {
                 if (peerConnection.connectionState === "connected") {
@@ -121,7 +142,7 @@ export function useRTC() {
             })
         })
 
-        // receive ice candidate to caller
+        // receive ice candidate from caller
         socket.on(SOCKET_EVENTS.RECEIVE_ICE_CANDIDATE, async (data: any) => {
             if (data.ice) {
                 peerConnection?.addIceCandidate(data.ice)
@@ -167,6 +188,10 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
             // update download
             handleFileUpload(file, dataChannel, peerConnection, (o) => {
                 setOffset(o)
+
+                if (o === file.size) {
+                    setState(null)
+                }
             })
         })
     }
@@ -210,6 +235,8 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
                     const url = URL.createObjectURL(received)
                     dowloadUrl(url, transDetails.fileName)
                     URL.revokeObjectURL(url)
+
+                    setState(null)
                 }
             })
         })
