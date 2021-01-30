@@ -1,6 +1,6 @@
 import { SOCKET_EVENTS } from "consts"
 import { handleFileUpload, dowloadUrl } from "utils"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { io } from "socket.io-client"
 
 export type User = {
@@ -191,6 +191,12 @@ export function useRTC() {
 export function useFileUpload(peerConnection: RTCPeerConnection | null) {
     const [transferDetails, setTransferDetails] = useState<TransferDetails[]>([])
 
+    // bitrate calculations
+    const bytesPrev = useRef(0)
+    const timestampStart = useRef(0)
+    const timestampPrev = useRef(0)
+    const statsInterval = useRef<any>()
+
     const uploadFile = (peerId: string, dataChannel?: RTCDataChannel, file?: File) => {
         if (!file || !peerConnection || !dataChannel) {
             console.log("File or connection not available")
@@ -211,7 +217,7 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
             // store file details in state
             setTransferDetails((transferDetails) => transferDetails.concat(details))
 
-            // update download
+            // update upload
             handleFileUpload(file, dataChannel, peerConnection, (offset) => {
                 setTransferDetails((transferDetails) => {
                     return transferDetails.map((d) => {
@@ -267,7 +273,6 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
                     })
                 })
 
-                console.log({ details })
                 if (localOffset === details?.fileSize) {
                     const received = new Blob(receiveBuffer)
                     receiveBuffer = []
@@ -277,8 +282,59 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
                     URL.revokeObjectURL(url)
                 }
             })
+
+            // listen for changes
+            const onReceiveChannelStateChange = async () => {
+                if (dataChannel.readyState == "open") {
+                    const caller = dataChannel.label.split("-")[0]
+                    timestampStart.current = new Date().getTime()
+                    timestampPrev.current = timestampStart.current
+
+                    statsInterval.current = setInterval(() => getStats(caller), 500)
+                    await getStats(caller)
+                }
+            }
+
+            dataChannel.onopen = onReceiveChannelStateChange
+            dataChannel.onclose = onReceiveChannelStateChange
         })
     }, [peerConnection])
+
+    // track stats
+    const getStats = async (caller: string) => {
+        if (!peerConnection) return
+        const stats = await peerConnection.getStats()
+        let activeCandidatePair: any
+
+        stats.forEach((report) => {
+            if (report.type === "transport") {
+                activeCandidatePair = stats.get(report.selectedCandidatePairId)
+            }
+        })
+
+        if (!activeCandidatePair) return
+        if (timestampPrev.current === activeCandidatePair.timestamp) return
+
+        const bytesNow = activeCandidatePair.bytesReceived
+        const bitrate = Math.round(
+            ((bytesNow - bytesPrev.current) * 8) /
+                (activeCandidatePair.timestamp - timestampPrev.current)
+        )
+
+        // set bitrate for UI
+        setTransferDetails((transferDetails) => {
+            return transferDetails.map((d) => {
+                if (d.peerId === caller) {
+                    return { ...d, transferSpeed: bitrate }
+                }
+
+                return d
+            })
+        })
+
+        timestampPrev.current = activeCandidatePair.timestamp
+        bytesPrev.current = bytesNow
+    }
 
     return {
         uploadFile,

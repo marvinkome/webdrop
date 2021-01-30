@@ -1,4 +1,5 @@
 import { TransferDetails } from "containers/home/hooks"
+import { fileSize } from "utils"
 import styles from "./style.module.scss"
 
 type ProgressProps = {
@@ -6,14 +7,9 @@ type ProgressProps = {
     peerName: string
 }
 export function Progress({ transferDetails, peerName }: ProgressProps) {
-    const size = transferDetails.fileSize.toLocaleString("en-GB", {
-        notation: "compact",
-        compactDisplay: "short",
-    })
-    const sizeSent = transferDetails.dataTransferred?.toLocaleString("en-GB", {
-        notation: "compact",
-        compactDisplay: "short",
-    })
+    const size = fileSize(transferDetails.fileSize)
+    const sizeSent = fileSize(transferDetails.dataTransferred)
+    const bitrate = fileSize(transferDetails.transferSpeed)
 
     const progressPercentage = Math.floor(
         (transferDetails.dataTransferred || 0 / transferDetails.fileSize) * 100
@@ -32,7 +28,7 @@ export function Progress({ transferDetails, peerName }: ProgressProps) {
 
                 <span>
                     {transferDetails.isUploading ? "Sent" : "Received"} <b>{sizeSent}b</b> of{" "}
-                    <b>{size}b</b>
+                    <b>{size}b</b> {bitrate && <b>{bitrate}bps</b>}
                 </span>
             </div>
 

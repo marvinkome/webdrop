@@ -133,3 +133,11 @@ export function dowloadUrl(url: string, name: string) {
 
     a.click()
 }
+
+export function fileSize(bytes?: number) {
+    if (!bytes) return false
+
+    var exp = (Math.log(bytes) / Math.log(1024)) | 0
+    var result = (bytes / Math.pow(1024, exp)).toFixed(2)
+    return result + (exp == 0 ? "bytes" : "KMGTPEZY"[exp - 1])
+}
