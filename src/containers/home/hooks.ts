@@ -9,10 +9,17 @@ export type User = {
     id: string
 }
 
+export type ConnectionStats = {
+    status?: "connected" | "connecting"
+    peerId: string
+}
+
 export type TransferDetails = {
     fileName: string
     fileSize: number
     peerId: string
+    dataTransferred: number
+    transferSpeed: number
 }
 
 const socket = io("/", { transports: ["websocket"] })
@@ -42,8 +49,7 @@ export function useSocket() {
 
 export function useRTC() {
     const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null)
-    const [connectingPeers, setConnectingPeers] = useState<string[]>([])
-    const [connectedPeers, setConnectedPeers] = useState<string[]>([])
+    const [connectionStats, setConnectionStats] = useState<ConnectionStats[]>([])
 
     // create peerConnection when component mounts on both ends
     useEffect(() => {
@@ -64,7 +70,12 @@ export function useRTC() {
 
         // send offer to receiver
         socket.emit(SOCKET_EVENTS.SEND_OFFER, { offer, to: socketId })
-        setConnectingPeers(connectingPeers.concat(socketId))
+        setConnectionStats((connectionStats) => {
+            return connectionStats.concat({
+                peerId: socketId,
+                status: "connecting",
+            })
+        })
 
         // receive answer from receiver
         socket.on(SOCKET_EVENTS.RECEIVE_ANSWER, async (data: any) => {
@@ -96,8 +107,15 @@ export function useRTC() {
         peerConnection.addEventListener("connectionstatechange", () => {
             console.log("connection", peerConnection.connectionState)
             if (peerConnection.connectionState === "connected") {
-                setConnectingPeers(connectingPeers.filter((peer) => peer === socketId))
-                setConnectedPeers(connectedPeers.concat(socketId))
+                setConnectionStats((connectionStats) => {
+                    return connectionStats.map((peer) => {
+                        if (peer.peerId === socketId) {
+                            return { ...peer, status: "connected" as any }
+                        }
+
+                        return peer
+                    })
+                })
             }
         })
 
@@ -119,7 +137,12 @@ export function useRTC() {
 
                 // send answer to caller
                 socket.emit(SOCKET_EVENTS.SEND_ANSWER, { answer, to: data.socketId })
-                setConnectingPeers(connectingPeers.concat(data.socketId))
+                setConnectionStats((connectionStats) => {
+                    return connectionStats.concat({
+                        peerId: data.socketId,
+                        status: "connecting",
+                    })
+                })
             }
 
             // send ice candidate to caller
@@ -136,8 +159,15 @@ export function useRTC() {
             // mark peer as connected when connection status changes
             peerConnection?.addEventListener("connectionstatechange", () => {
                 if (peerConnection.connectionState === "connected") {
-                    setConnectingPeers(connectingPeers.filter((peer) => peer === data.socketId))
-                    setConnectedPeers(connectedPeers.concat(data.socketId))
+                    setConnectionStats((connectionStats) => {
+                        return connectionStats.map((peer) => {
+                            if (peer.peerId === data.socketId) {
+                                return { ...peer, status: "connected" as any }
+                            }
+
+                            return peer
+                        })
+                    })
                 }
             })
         })
@@ -153,8 +183,7 @@ export function useRTC() {
     return {
         makeConnection,
         peerConnection,
-        connectingPeers,
-        connectedPeers,
+        connectionStats,
     }
 }
 
@@ -180,6 +209,7 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
             dataChannel.send(JSON.stringify(transferDetails))
 
             // store file details in state
+            // @ts-ignore
             setTransferDetails(transferDetails)
 
             // upload file

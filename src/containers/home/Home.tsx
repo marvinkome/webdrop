@@ -4,13 +4,12 @@ import { Footer } from "components/Footer"
 import { Circles } from "components/Circles"
 import { Progress } from "components/Progress"
 import { User, Peer } from "components/Users"
-import { User as UserType, TransferDetails } from "./hooks"
+import { User as UserType, TransferDetails, ConnectionStats } from "./hooks"
 
 type Props = {
     me?: UserType
     peers?: UserType[]
-    connectingPeers: string[]
-    connectedPeers: string[]
+    connectionStats: ConnectionStats[]
     transferDetails: TransferDetails | null
     fileState: "uploading" | "downloading" | null
     dataTransferred: number
@@ -44,8 +43,7 @@ export function HomePage(props: Props) {
                             avatar={avatar}
                             name={name}
                             key={id}
-                            isConnecting={props.connectingPeers.includes(id)}
-                            isConnected={props.connectedPeers.includes(id)}
+                            stats={props.connectionStats.find((peer) => peer.peerId === id)}
                             onSelectFile={(file) => props.onSelectFile(id, file)}
                         />
                     ))}

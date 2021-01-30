@@ -1,6 +1,7 @@
 import { ChangeEvent, useRef } from "react"
 import cls from "classnames"
 import styles from "./styles.module.scss"
+import { ConnectionStats } from "containers/home/hooks"
 
 export function User({ avatar, name }: { avatar: string; name: string }) {
     return (
@@ -14,8 +15,7 @@ export function User({ avatar, name }: { avatar: string; name: string }) {
 type PeerProps = {
     avatar: string
     name: string
-    isConnecting: boolean
-    isConnected: boolean
+    stats?: ConnectionStats
     onSelectFile: (file?: File) => void
 }
 export function Peer({ avatar, name, onSelectFile, ...props }: PeerProps) {
@@ -33,8 +33,8 @@ export function Peer({ avatar, name, onSelectFile, ...props }: PeerProps) {
     return (
         <div
             className={cls(styles.peerAvatar, {
-                [styles.connecting]: props.isConnecting,
-                [styles.connected]: props.isConnected,
+                [styles.connecting]: props.stats?.status === "connecting",
+                [styles.connected]: props.stats?.status === "connected",
             })}
         >
             <img src={avatar} alt="Peer Avatar" onClick={() => fileInputRef.current?.click()} />
