@@ -9,7 +9,7 @@ export function Home() {
     const onSelectFile = async (peerId: string, file?: File) => {
         // when user is ready to send file, make a connection with the peer
         let dataChannel = await makeConnection(peerId)
-        // uploadFile(peerId, dataChannel!, file)
+        uploadFile(peerId, dataChannel!, file)
     }
 
     return (
@@ -18,8 +18,6 @@ export function Home() {
             peers={peers}
             connectionStats={rtcData.connectionStats}
             transferDetails={transferInfo.transferDetails}
-            fileState={transferInfo.fileState}
-            dataTransferred={transferInfo.dataTransferred}
             onSelectFile={onSelectFile}
         />
     )

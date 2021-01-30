@@ -18,8 +18,9 @@ export type TransferDetails = {
     fileName: string
     fileSize: number
     peerId: string
-    dataTransferred: number
-    transferSpeed: number
+    isUploading?: boolean
+    dataTransferred?: number
+    transferSpeed?: number
 }
 
 const socket = io("/", { transports: ["websocket"] })
@@ -188,9 +189,7 @@ export function useRTC() {
 }
 
 export function useFileUpload(peerConnection: RTCPeerConnection | null) {
-    const [transferDetails, setTransferDetails] = useState<TransferDetails | null>(null)
-    const [offset, setOffset] = useState(0)
-    const [state, setState] = useState<"uploading" | "downloading" | null>(null)
+    const [transferDetails, setTransferDetails] = useState<TransferDetails[]>([])
 
     const uploadFile = (peerId: string, dataChannel?: RTCDataChannel, file?: File) => {
         if (!file || !peerConnection || !dataChannel) {
@@ -199,29 +198,30 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
         }
 
         dataChannel.addEventListener("open", () => {
-            const transferDetails = {
+            const details = {
                 fileName: file.name,
                 fileSize: file.size,
                 peerId,
+                isUploading: true,
             }
 
             // send file details
-            dataChannel.send(JSON.stringify(transferDetails))
+            dataChannel.send(JSON.stringify(details))
 
             // store file details in state
-            // @ts-ignore
-            setTransferDetails(transferDetails)
-
-            // upload file
-            setState("uploading")
+            setTransferDetails((transferDetails) => transferDetails.concat(details))
 
             // update download
-            handleFileUpload(file, dataChannel, peerConnection, (o) => {
-                setOffset(o)
+            handleFileUpload(file, dataChannel, peerConnection, (offset) => {
+                setTransferDetails((transferDetails) => {
+                    return transferDetails.map((d) => {
+                        if (d.peerId === peerId) {
+                            return { ...d, dataTransferred: offset }
+                        }
 
-                if (o === file.size) {
-                    setState(null)
-                }
+                        return d
+                    })
+                })
             })
         })
     }
@@ -232,7 +232,7 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
 
         peerConnection?.addEventListener("datachannel", (event) => {
             const dataChannel = event.channel
-            let transDetails: TransferDetails | null = null
+            let details: TransferDetails
             let receiveBuffer: any[] = []
             let localOffset: number = 0
 
@@ -240,33 +240,41 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
             dataChannel.addEventListener("message", (e: MessageEvent<any>) => {
                 const caller = dataChannel.label.split("-")[0]
                 const data = e.data
-                setState("downloading")
 
                 // handle file details
                 if (typeof data === "string") {
-                    const transferDetails = JSON.parse(data)
-                    transferDetails.peerId = caller
+                    details = JSON.parse(data)
+                    details.peerId = caller
+                    details.isUploading = false
 
-                    // store file details in state
-                    transDetails = transferDetails
-                    setTransferDetails(transferDetails)
+                    // store transferDetails for UI
+                    setTransferDetails((transferDetails) => transferDetails.concat(details))
                     return
                 }
 
                 // store file
                 receiveBuffer.push(data)
                 localOffset = localOffset + data.byteLength
-                setOffset(localOffset)
 
-                if (localOffset === transDetails?.fileSize) {
+                // set dataTransferred for UI
+                setTransferDetails((transferDetails) => {
+                    return transferDetails.map((d) => {
+                        if (d.peerId === caller) {
+                            return { ...d, dataTransferred: localOffset }
+                        }
+
+                        return d
+                    })
+                })
+
+                console.log({ details })
+                if (localOffset === details?.fileSize) {
                     const received = new Blob(receiveBuffer)
                     receiveBuffer = []
 
                     const url = URL.createObjectURL(received)
-                    dowloadUrl(url, transDetails.fileName)
+                    dowloadUrl(url, details.fileName)
                     URL.revokeObjectURL(url)
-
-                    setState(null)
                 }
             })
         })
@@ -275,7 +283,5 @@ export function useFileUpload(peerConnection: RTCPeerConnection | null) {
     return {
         uploadFile,
         transferDetails,
-        dataTransferred: offset,
-        fileState: state,
     }
 }

@@ -10,9 +10,7 @@ type Props = {
     me?: UserType
     peers?: UserType[]
     connectionStats: ConnectionStats[]
-    transferDetails: TransferDetails | null
-    fileState: "uploading" | "downloading" | null
-    dataTransferred: number
+    transferDetails: TransferDetails[]
     onSelectFile: (peerId: string, file?: File) => void
 }
 
@@ -21,18 +19,13 @@ export function HomePage(props: Props) {
         <>
             <Header />
 
-            {props.transferDetails && (
+            {props.transferDetails.map((details) => (
                 <Progress
-                    fileState={props.fileState}
-                    fileName={props.transferDetails.fileName}
-                    fileSize={props.transferDetails.fileSize}
-                    dataTransferred={props.dataTransferred}
-                    peerName={
-                        props.peers?.find(({ id }) => id === props.transferDetails?.peerId)?.name ||
-                        ""
-                    }
+                    key={details.peerId}
+                    transferDetails={details}
+                    peerName={props.peers?.find(({ id }) => id === details?.peerId)?.name || ""}
                 />
-            )}
+            ))}
 
             <section className={styles.body}>
                 <div className={styles.innerBody}>

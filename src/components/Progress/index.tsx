@@ -1,37 +1,37 @@
+import { TransferDetails } from "containers/home/hooks"
 import styles from "./style.module.scss"
 
 type ProgressProps = {
-    fileName: string
+    transferDetails: TransferDetails
     peerName: string
-    fileSize: number
-    dataTransferred: number
-    fileState: "uploading" | "downloading" | null
 }
-export function Progress({ fileState, ...props }: ProgressProps) {
-    const size = props.fileSize.toLocaleString("en-GB", {
+export function Progress({ transferDetails, peerName }: ProgressProps) {
+    const size = transferDetails.fileSize.toLocaleString("en-GB", {
         notation: "compact",
         compactDisplay: "short",
     })
-    const sizeSent = props.dataTransferred.toLocaleString("en-GB", {
+    const sizeSent = transferDetails.dataTransferred?.toLocaleString("en-GB", {
         notation: "compact",
         compactDisplay: "short",
     })
 
-    const progressPercentage = Math.floor((props.dataTransferred / props.fileSize) * 100)
+    const progressPercentage = Math.floor(
+        (transferDetails.dataTransferred || 0 / transferDetails.fileSize) * 100
+    )
 
     return (
         <div className={styles.downloadProgress}>
             <div className={styles.inner}>
                 <p>
-                    {fileState === "downloading" ? "Receiving" : "Tranferring"}{" "}
+                    {transferDetails.isUploading ? "Tranferring" : "Receiving"}{" "}
                     <span>
-                        {props.fileName} ({size}b)
+                        {transferDetails.fileName} ({size}b)
                     </span>{" "}
-                    {fileState === "downloading" ? "from" : "to"} <span>{props.peerName}</span>
+                    {transferDetails.isUploading ? "to" : "from"} <span>{peerName}</span>
                 </p>
 
                 <span>
-                    {fileState === "downloading" ? "Received" : "Sent"} <b>{sizeSent}b</b> of{" "}
+                    {transferDetails.isUploading ? "Sent" : "Received"} <b>{sizeSent}b</b> of{" "}
                     <b>{size}b</b>
                 </span>
             </div>
