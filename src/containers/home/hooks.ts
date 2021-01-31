@@ -1,5 +1,6 @@
 import { SOCKET_EVENTS } from "consts"
 import { handleFileUpload, dowloadUrl } from "utils"
+import { toast } from "react-toastify"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { io } from "socket.io-client"
 
@@ -48,296 +49,240 @@ export function useSocket() {
     }
 }
 
-export function useRTC() {
-    const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null)
-    const [connectionStats, setConnectionStats] = useState<ConnectionStats[]>([])
+export function useRTCTransfer() {
+    // state
+    const [bitrate, setBitrate] = useState(0)
 
-    // create peerConnection when component mounts on both ends
-    useEffect(() => {
-        const peerConnection = new RTCPeerConnection({})
-        setPeerConnection(peerConnection)
-    }, [])
+    // refs
+    const localConnection = useRef<RTCPeerConnection>()
+    const remoteConnection = useRef<RTCPeerConnection>()
 
-    // create function to call the receiver
-    const makeConnection = async (socketId: string) => {
-        if (!peerConnection) return
+    const sendChannel = useRef<RTCDataChannel>()
+    const receiveChannel = useRef<RTCDataChannel>()
 
-        // create and store data channel for connection
-        const dataChannel = peerConnection.createDataChannel(`${socket.id}-${socketId}`)
+    const receiveBuffer = useRef<any[]>()
+    const receiveSize = useRef<number>()
 
-        // create offer for receiver
-        const offer = await peerConnection.createOffer()
-        await peerConnection.setLocalDescription(new RTCSessionDescription(offer))
-
-        // send offer to receiver
-        socket.emit(SOCKET_EVENTS.SEND_OFFER, { offer, to: socketId })
-        setConnectionStats((connectionStats) => {
-            return connectionStats.concat({
-                peerId: socketId,
-                status: "connecting",
-            })
-        })
-
-        // receive answer from receiver
-        socket.on(SOCKET_EVENTS.RECEIVE_ANSWER, async (data: any) => {
-            if (data.answer) {
-                console.log("send remote")
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
-            }
-        })
-
-        // send ice candidate to receiver
-        peerConnection.addEventListener("icecandidate", (event) => {
-            console.log("send ice", event.candidate)
-            if (event.candidate) {
-                socket.emit(SOCKET_EVENTS.SEND_ICE_CANDIDATE, {
-                    ice: event.candidate,
-                    to: socketId,
-                })
-            }
-        })
-
-        // receive ice candidate from receiver
-        socket.on(SOCKET_EVENTS.RECEIVE_ICE_CANDIDATE, async (data: any) => {
-            if (data.ice) {
-                peerConnection?.addIceCandidate(data.ice)
-            }
-        })
-
-        // mark peer as connected when connection status changes
-        peerConnection.addEventListener("connectionstatechange", () => {
-            console.log("connection", peerConnection.connectionState)
-            if (peerConnection.connectionState === "connected") {
-                setConnectionStats((connectionStats) => {
-                    return connectionStats.map((peer) => {
-                        if (peer.peerId === socketId) {
-                            return { ...peer, status: "connected" as any }
-                        }
-
-                        return peer
-                    })
-                })
-            }
-        })
-
-        return dataChannel
-    }
-
-    // receive call events as receiver
-    useEffect(() => {
-        if (!peerConnection) return
-
-        socket.on(SOCKET_EVENTS.RECEIVE_OFFER, async (data: any) => {
-            if (data.offer) {
-                // set offer
-                await peerConnection?.setRemoteDescription(new RTCSessionDescription(data.offer))
-
-                // create answer for caller
-                const answer = await peerConnection?.createAnswer()
-                await peerConnection?.setLocalDescription(new RTCSessionDescription(answer))
-
-                // send answer to caller
-                socket.emit(SOCKET_EVENTS.SEND_ANSWER, { answer, to: data.socketId })
-                setConnectionStats((connectionStats) => {
-                    return connectionStats.concat({
-                        peerId: data.socketId,
-                        status: "connecting",
-                    })
-                })
-            }
-
-            // send ice candidate to caller
-            peerConnection.addEventListener("icecandidate", (event) => {
-                console.log("send ice", event.candidate)
-                if (event.candidate) {
-                    socket.emit(SOCKET_EVENTS.SEND_ICE_CANDIDATE, {
-                        ice: event.candidate,
-                        to: data.socketId,
-                    })
-                }
-            })
-
-            // mark peer as connected when connection status changes
-            peerConnection?.addEventListener("connectionstatechange", () => {
-                if (peerConnection.connectionState === "connected") {
-                    setConnectionStats((connectionStats) => {
-                        return connectionStats.map((peer) => {
-                            if (peer.peerId === data.socketId) {
-                                return { ...peer, status: "connected" as any }
-                            }
-
-                            return peer
-                        })
-                    })
-                }
-            })
-        })
-
-        // receive ice candidate from caller
-        socket.on(SOCKET_EVENTS.RECEIVE_ICE_CANDIDATE, async (data: any) => {
-            if (data.ice) {
-                peerConnection?.addIceCandidate(data.ice)
-            }
-        })
-    }, [peerConnection])
-
-    return {
-        makeConnection,
-        peerConnection,
-        connectionStats,
-    }
-}
-
-export function useFileUpload(peerConnection: RTCPeerConnection | null) {
-    const [transferDetails, setTransferDetails] = useState<TransferDetails[]>([])
-
-    // bitrate calculations
     const bytesPrev = useRef(0)
     const timestampStart = useRef(0)
     const timestampPrev = useRef(0)
     const statsInterval = useRef<any>()
 
-    const uploadFile = (peerId: string, dataChannel?: RTCDataChannel, file?: File) => {
-        if (!file || !peerConnection || !dataChannel) {
-            console.log("File or connection not available")
+    // functions
+    async function createRemoteConnection(socketId: string) {
+        remoteConnection.current = new RTCPeerConnection()
+        console.log("Created remote peer connection")
+
+        remoteConnection.current.addEventListener("icecandidate", async (e) => {
+            console.log("Remote ICE candidate: ", e.cancelable)
+            socket.emit(SOCKET_EVENTS.SEND_ICE_CANDIDATE, { ice: e.candidate, to: socketId })
+        })
+
+        remoteConnection.current.addEventListener("datachannel", receiveChannelCb)
+    }
+
+    async function createLocalConnection(socketId: string, file: File) {
+        localConnection.current = new RTCPeerConnection()
+        console.log("Created local peer connection")
+
+        sendChannel.current = localConnection.current.createDataChannel("")
+        sendChannel.current.binaryType = "arraybuffer"
+        console.log("Created send data channel")
+
+        sendChannel.current.addEventListener("open", () => onSendChannelStateChange(file))
+        sendChannel.current.addEventListener("close", () => onSendChannelStateChange(file))
+        sendChannel.current.addEventListener("error", (e) => onError(e))
+
+        localConnection.current.addEventListener("icecandidate", async (e) => {
+            console.log("Local ICE candidate: ", e.cancelable)
+            socket.emit(SOCKET_EVENTS.SEND_ICE_CANDIDATE, { ice: e.candidate, to: socketId })
+        })
+
+        const offer = await localConnection.current.createOffer()
+        localConnection.current.setLocalDescription(offer)
+        console.log("Offer from localConnection: ", offer.sdp)
+        socket.emit(SOCKET_EVENTS.SEND_OFFER, { offer, to: socketId })
+    }
+
+    function closeDataChannels() {
+        sendChannel.current?.close()
+        sendChannel.current = undefined
+
+        receiveChannel.current?.close()
+        receiveChannel.current = undefined
+
+        console.log("Closed data channels")
+
+        localConnection.current?.close()
+        remoteConnection.current?.close()
+
+        localConnection.current = undefined
+        remoteConnection.current = undefined
+        console.log("Closed peer connections")
+    }
+
+    function sendData(file: File) {
+        console.log(`File is ${[file.name, file.size, file.type, file.lastModified].join(" ")}`)
+
+        if (file.size === 0) {
+            // toast message
+            toast.error("File is empty, please select a non-empty file")
+            closeDataChannels()
             return
         }
 
-        dataChannel.addEventListener("open", () => {
-            const details = {
-                fileName: file.name,
-                fileSize: file.size,
-                peerId,
-                isUploading: true,
+        const chunkSize = 16384
+        let offset = 0
+        let fileReader = new FileReader()
+
+        const readSlice = (o: number) => {
+            console.log("readSlice: ", o)
+            const slice = file.slice(offset, o + chunkSize)
+            fileReader.readAsArrayBuffer(slice)
+        }
+
+        fileReader.addEventListener("error", (error) => console.error("Error reading file:", error))
+        fileReader.addEventListener("abort", (event) => console.log("File reading aborted:", event))
+        fileReader.addEventListener("load", (e) => {
+            console.log("FileRead.onload", e)
+            sendChannel.current?.send(e.target?.result as string)
+            offset += (e.target?.result as ArrayBuffer).byteLength
+
+            if (offset < file.size) {
+                readSlice(offset)
             }
-
-            // send file details
-            dataChannel.send(JSON.stringify(details))
-
-            // store file details in state
-            setTransferDetails((transferDetails) => transferDetails.concat(details))
-
-            // update upload
-            handleFileUpload(file, dataChannel, peerConnection, (offset) => {
-                setTransferDetails((transferDetails) => {
-                    return transferDetails.map((d) => {
-                        if (d.peerId === peerId) {
-                            return { ...d, dataTransferred: offset }
-                        }
-
-                        return d
-                    })
-                })
-            })
         })
+
+        readSlice(0)
     }
 
-    // listen for data as receiver
-    useEffect(() => {
-        if (!peerConnection) return
+    // callbacks
+    function receiveChannelCb(event: RTCDataChannelEvent) {
+        console.log("Receive Channel Callback")
+        receiveChannel.current = event.channel
+        receiveChannel.current.binaryType = "arraybuffer"
 
-        peerConnection?.addEventListener("datachannel", (event) => {
-            const dataChannel = event.channel
-            let details: TransferDetails
-            let receiveBuffer: any[] = []
-            let localOffset: number = 0
+        receiveChannel.current.onmessage = onReceiveMessageCb
+        receiveChannel.current.onopen = onReceiveChannelStateChange
+        receiveChannel.current.onclose = onReceiveChannelStateChange
+    }
 
-            // listen for messages
-            dataChannel.addEventListener("message", (e: MessageEvent<any>) => {
-                const caller = dataChannel.label.split("-")[0]
-                const data = e.data
+    function onReceiveMessageCb(event: MessageEvent) {
+        console.log("Receive Message", event.data.byteLength)
+        receiveBuffer.current?.push(event.data)
+        receiveSize.current += event.data.byteLength
 
-                // handle file details
-                if (typeof data === "string") {
-                    details = JSON.parse(data)
-                    details.peerId = caller
-                    details.isUploading = false
+        // track when download is complete
+        closeDataChannels()
+    }
 
-                    // store transferDetails for UI
-                    setTransferDetails((transferDetails) => transferDetails.concat(details))
-                    return
-                }
+    function onSendChannelStateChange(file: File) {
+        if (!sendChannel.current) return
+        const { readyState } = sendChannel.current
+        console.log(`Send channel state is: ${readyState}`)
 
-                // store file
-                receiveBuffer.push(data)
-                localOffset = localOffset + data.byteLength
+        if (readyState === "open") {
+            sendData(file)
+        }
+    }
 
-                // set dataTransferred for UI
-                setTransferDetails((transferDetails) => {
-                    return transferDetails.map((d) => {
-                        if (d.peerId === caller) {
-                            return { ...d, dataTransferred: localOffset }
-                        }
+    function onError(error: any) {
+        if (sendChannel.current) {
+            console.error("Error in sendChannel:", error)
+            return
+        }
 
-                        return d
-                    })
-                })
+        console.log("Error in sendChannel which is already closed:", error)
+    }
 
-                if (localOffset === details?.fileSize) {
-                    const received = new Blob(receiveBuffer)
-                    receiveBuffer = []
+    async function onReceiveChannelStateChange() {
+        if (!receiveChannel.current) return
+        const readyState = receiveChannel.current.readyState
+        console.log(`Receive channel state is: ${readyState}`)
 
-                    const url = URL.createObjectURL(received)
-                    dowloadUrl(url, details.fileName)
-                    URL.revokeObjectURL(url)
-                }
-            })
+        if (readyState === "open") {
+            timestampStart.current = new Date().getTime()
+            timestampPrev.current = timestampStart.current
+            statsInterval.current = setInterval(displayStats, 500)
+            await displayStats()
+        }
+    }
 
-            // listen for changes
-            const onReceiveChannelStateChange = async () => {
-                if (dataChannel.readyState == "open") {
-                    const caller = dataChannel.label.split("-")[0]
-                    timestampStart.current = new Date().getTime()
-                    timestampPrev.current = timestampStart.current
+    async function displayStats() {
+        if (
+            !remoteConnection.current ||
+            remoteConnection.current.iceConnectionState !== "connected"
+        ) {
+            return
+        }
 
-                    statsInterval.current = setInterval(() => getStats(caller), 500)
-                    await getStats(caller)
-                }
-            }
-
-            dataChannel.onopen = onReceiveChannelStateChange
-            dataChannel.onclose = onReceiveChannelStateChange
-        })
-    }, [peerConnection])
-
-    // track stats
-    const getStats = async (caller: string) => {
-        if (!peerConnection) return
-        const stats = await peerConnection.getStats()
+        const stats = await remoteConnection.current.getStats()
         let activeCandidatePair: any
-
         stats.forEach((report) => {
             if (report.type === "transport") {
                 activeCandidatePair = stats.get(report.selectedCandidatePairId)
             }
         })
 
-        if (!activeCandidatePair) return
-        if (timestampPrev.current === activeCandidatePair.timestamp) return
+        if (activeCandidatePair) {
+            if (timestampPrev === activeCandidatePair.timestamp) return
 
-        const bytesNow = activeCandidatePair.bytesReceived
-        const bitrate = Math.round(
-            ((bytesNow - bytesPrev.current) * 8) /
-                (activeCandidatePair.timestamp - timestampPrev.current)
-        )
+            // calculate current bitrate
+            const bytesNow = activeCandidatePair.bytesReceived
+            const bitrate = Math.round(
+                ((bytesNow - bytesPrev.current) * 8) /
+                    (activeCandidatePair.timestamp - timestampPrev.current)
+            )
 
-        // set bitrate for UI
-        setTransferDetails((transferDetails) => {
-            return transferDetails.map((d) => {
-                if (d.peerId === caller) {
-                    return { ...d, transferSpeed: bitrate }
-                }
+            setBitrate(bitrate)
 
-                return d
-            })
-        })
-
-        timestampPrev.current = activeCandidatePair.timestamp
-        bytesPrev.current = bytesNow
+            timestampPrev.current = activeCandidatePair.timestamp
+            bytesPrev.current = bytesNow
+        }
     }
 
+    // remote socket listeners
+    useEffect(() => {
+        socket.on(SOCKET_EVENTS.RECEIVE_ICE_CANDIDATE, async ({ ice, socketId }: any) => {
+            if (localConnection.current) return
+            if (!remoteConnection.current) {
+                await createRemoteConnection(socketId)
+            }
+
+            console.log("Local ICE candidate: ", ice)
+            await remoteConnection.current?.addIceCandidate(ice)
+        })
+
+        socket.on(SOCKET_EVENTS.RECEIVE_OFFER, async ({ offer, socketId }: any) => {
+            if (!remoteConnection.current) {
+                await createRemoteConnection(socketId)
+            }
+
+            await remoteConnection.current?.setRemoteDescription(offer)
+
+            const answer = await remoteConnection.current?.createAnswer()
+            await remoteConnection.current?.setLocalDescription(answer!)
+            console.log("Answer from remoteConnection: ", answer?.sdp)
+            socket.emit(SOCKET_EVENTS.SEND_ANSWER, { answer, to: socketId })
+        })
+    }, [])
+
+    // local socket listeners
+    useEffect(() => {
+        socket.on(SOCKET_EVENTS.RECEIVE_ICE_CANDIDATE, async (data: any) => {
+            if (data.ice) {
+                console.log("Remote ICE candidate: ", data.ice)
+                localConnection.current?.addIceCandidate(data.ice)
+            }
+        })
+
+        socket.on(SOCKET_EVENTS.RECEIVE_ANSWER, async ({ answer }: any) => {
+            await localConnection.current?.setRemoteDescription(answer)
+            console.log("Answer from remoteConnection: ", answer?.sdp)
+        })
+    }, [])
+
     return {
-        uploadFile,
-        transferDetails,
+        createLocalConnection,
     }
 }
