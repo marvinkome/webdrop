@@ -1,6 +1,6 @@
 import cls from "classnames"
 import styles from "./styles.module.scss"
-import { ChangeEvent, useRef } from "react"
+import { ChangeEvent, useEffect, useRef, useState } from "react"
 import { CircularProgressbarWithChildren } from "react-circular-progressbar"
 import { MdCheck } from "react-icons/md"
 import { fileSize } from "utils"
@@ -26,6 +26,26 @@ type PeerProps = {
     onSelectFile: (file?: File) => void
 }
 export function Peer({ avatar, name, onSelectFile, transferData }: PeerProps) {
+    const [transferState, setTransferState] = useState<"starting" | "started" | "stopped">()
+
+    useEffect(() => {
+        setTransferState(transferData.transferState)
+    }, [transferData.transferState])
+
+    useEffect(() => {
+        let timeout: NodeJS.Timeout
+
+        if (transferState === "stopped") {
+            timeout = setInterval(() => {
+                setTransferState(undefined)
+            }, 3000)
+        }
+
+        return () => {
+            if (timeout) clearTimeout(timeout)
+        }
+    }, [transferState])
+
     const fileInputRef = useRef<HTMLInputElement | null>(null)
     const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         e.stopPropagation()
@@ -43,8 +63,8 @@ export function Peer({ avatar, name, onSelectFile, transferData }: PeerProps) {
     }
 
     const imgClassname = cls({
-        [styles.bordered]: transferData.transferState === undefined,
-        [styles.connecting]: transferData.transferState === "starting",
+        [styles.bordered]: transferState === undefined,
+        [styles.connecting]: transferState === "starting",
     })
 
     let image = (
@@ -56,7 +76,7 @@ export function Peer({ avatar, name, onSelectFile, transferData }: PeerProps) {
         />
     )
 
-    if (transferData.transferState === "started") {
+    if (transferState === "started") {
         image = (
             <CircularProgressbarWithChildren
                 styles={circularProgressStyles}
@@ -67,7 +87,7 @@ export function Peer({ avatar, name, onSelectFile, transferData }: PeerProps) {
         )
     }
 
-    if (transferData.transferState === "stopped") {
+    if (transferState === "stopped") {
         image = (
             <CircularProgressbarWithChildren
                 styles={circularProgressStyles}
@@ -87,7 +107,7 @@ export function Peer({ avatar, name, onSelectFile, transferData }: PeerProps) {
             {image}
 
             <span>
-                {transferData.transferState !== "started"
+                {transferState !== "started"
                     ? name
                     : transferData.transferType === "download"
                     ? `${fileSize(transferData.bitrate || 0)}bits/sec`
