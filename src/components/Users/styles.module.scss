@@ -28,30 +28,37 @@
     z-index: 100;
     padding: 5px;
     cursor: pointer;
-
+    width: 97px;
     bottom: 192px;
     margin-left: -296px;
 
-    &.connecting img {
-        border-color: $gold;
-    }
-
-    &.connected img {
-        border-color: $green;
-    }
-
     img {
-        width: 76px;
-        height: 76px;
+        width: 73px;
+        height: 73px;
         object-fit: cover;
         border-radius: 50%;
-        border: 5px solid $color2;
         transition: all 0.2s ease-in-out;
 
         &:hover {
-            width: 80px;
-            height: 80px;
-            margin-bottom: -5px;
+            width: 74px;
+            height: 74px;
+        }
+    }
+
+    .completedOverlay {
+        position: absolute;
+        width: 73px;
+        height: 73px;
+        border-radius: 50%;
+        background-color: $green;
+        opacity: 0.9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        .icon {
+            color: $color0;
+            font-size: 1.8em;
         }
     }
 

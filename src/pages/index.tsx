@@ -1,7 +1,9 @@
 import Head from "next/head"
 import { ToastContainer } from "react-toastify"
 import { Home } from "containers/home"
+
 import "react-toastify/dist/ReactToastify.css"
+import "react-circular-progressbar/dist/styles.css"
 
 export default function Index() {
     return (
