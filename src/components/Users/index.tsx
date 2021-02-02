@@ -3,7 +3,6 @@ import styles from "./styles.module.scss"
 import { ChangeEvent, useRef } from "react"
 import { CircularProgressbarWithChildren } from "react-circular-progressbar"
 import { MdCheck } from "react-icons/md"
-import { ConnectionStats } from "containers/home/hooks"
 
 export function User({ avatar, name }: { avatar: string; name: string }) {
     return (
@@ -17,10 +16,15 @@ export function User({ avatar, name }: { avatar: string; name: string }) {
 type PeerProps = {
     avatar: string
     name: string
-    stats?: ConnectionStats
+    transferData: {
+        transferType?: "upload" | "download"
+        transferredSize: number
+        bitrate: number | null
+        transferState?: "starting" | "started" | "stopped"
+    }
     onSelectFile: (file?: File) => void
 }
-export function Peer({ avatar, name, onSelectFile, ...props }: PeerProps) {
+export function Peer({ avatar, name, onSelectFile, transferData }: PeerProps) {
     const fileInputRef = useRef<HTMLInputElement | null>(null)
     const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         e.stopPropagation()
@@ -33,25 +37,61 @@ export function Peer({ avatar, name, onSelectFile, ...props }: PeerProps) {
     }
 
     const circularProgressStyles = {
-        root: { width: "87px" },
-        path: { stroke: "#dca814" },
+        root: { width: "85px" },
+        path: { stroke: "#27ae60" },
     }
 
-    const containerCls = cls(styles.peerAvatar, {
-        [styles.connecting]: props.stats?.status === "connecting",
-        [styles.connected]: props.stats?.status === "connected",
+    const imgClassname = cls({
+        [styles.bordered]: transferData.transferState === undefined,
+        [styles.connecting]: transferData.transferState === "starting",
     })
 
-    return (
-        <div className={containerCls}>
-            <CircularProgressbarWithChildren styles={circularProgressStyles} value={35}>
-                <img src={avatar} alt={name} onClick={() => fileInputRef.current?.click()} />
-                {/* <div className={styles.completedOverlay}>
-                    <MdCheck className={styles.icon} />
-                </div> */}
-            </CircularProgressbarWithChildren>
+    let image = (
+        <img
+            className={imgClassname}
+            src={avatar}
+            alt={name}
+            onClick={() => fileInputRef.current?.click()}
+        />
+    )
 
-            <span>{name}</span>
+    if (transferData.transferState === "started") {
+        image = (
+            <CircularProgressbarWithChildren
+                styles={circularProgressStyles}
+                value={transferData.transferredSize}
+            >
+                <img src={avatar} alt={name} onClick={() => fileInputRef.current?.click()} />
+            </CircularProgressbarWithChildren>
+        )
+    }
+
+    if (transferData.transferState === "stopped") {
+        image = (
+            <CircularProgressbarWithChildren
+                styles={circularProgressStyles}
+                value={transferData.transferredSize}
+            >
+                <img src={avatar} alt={name} onClick={() => fileInputRef.current?.click()} />
+
+                <div className={styles.completedOverlay}>
+                    <MdCheck className={styles.icon} />
+                </div>
+            </CircularProgressbarWithChildren>
+        )
+    }
+
+    return (
+        <div className={styles.peerAvatar}>
+            {image}
+
+            <span>
+                {transferData.transferState !== "started"
+                    ? name
+                    : transferData.transferType === "download"
+                    ? `${transferData.bitrate} kbits/sec`
+                    : name}
+            </span>
 
             <input
                 type="file"

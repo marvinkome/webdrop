@@ -1,24 +1,16 @@
 import { HomePage } from "./Home"
-import { useSocket } from "./hooks"
+import { useRTCTransfer, useSocket } from "./hooks"
 
 export function Home() {
     const { me, peers } = useSocket()
-    // const { makeConnection, ...rtcData } = useRTC()
-    // const { uploadFile, ...transferInfo } = useFileUpload(rtcData.peerConnection)
+    const { createLocalConnection, ...transferData } = useRTCTransfer()
 
     const onSelectFile = async (peerId: string, file?: File) => {
-        // when user is ready to send file, make a connection with the peer
-        // let dataChannel = await makeConnection(peerId)
-        // uploadFile(peerId, dataChannel!, file)
+        if (!file) return
+        await createLocalConnection(peerId, file)
     }
 
     return (
-        <HomePage
-            me={me}
-            peers={peers}
-            connectionStats={[]}
-            transferDetails={[]}
-            onSelectFile={onSelectFile}
-        />
+        <HomePage me={me} peers={peers} onSelectFile={onSelectFile} transferData={transferData} />
     )
 }

@@ -24,13 +24,15 @@
 }
 
 .peerAvatar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
     position: absolute;
     z-index: 100;
     padding: 5px;
     cursor: pointer;
-    width: 97px;
-    bottom: 192px;
-    margin-left: -296px;
 
     img {
         width: 73px;
@@ -39,9 +41,12 @@
         border-radius: 50%;
         transition: all 0.2s ease-in-out;
 
-        &:hover {
-            width: 74px;
-            height: 74px;
+        &.bordered {
+            border: 5px solid $color2;
+        }
+
+        &.connecting {
+            border: 5px solid $gold;
         }
     }
 
@@ -70,7 +75,7 @@
 
     &:nth-of-type(2) {
         margin-left: -166px;
-        bottom: 345px;
+        bottom: 330px;
     }
 
     &:nth-of-type(3) {

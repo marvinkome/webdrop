@@ -1,7 +1,7 @@
 import { SOCKET_EVENTS } from "consts"
-import { handleFileUpload, dowloadUrl } from "utils"
+import { dowloadUrl } from "utils"
 import { toast } from "react-toastify"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { io } from "socket.io-client"
 
 export type User = {
@@ -10,18 +10,9 @@ export type User = {
     id: string
 }
 
-export type ConnectionStats = {
-    status?: "connected" | "connecting"
-    peerId: string
-}
-
-export type TransferDetails = {
+type FileDetails = {
     fileName: string
     fileSize: number
-    peerId: string
-    isUploading?: boolean
-    dataTransferred?: number
-    transferSpeed?: number
 }
 
 const socket = io("/", { transports: ["websocket"] })
@@ -51,7 +42,10 @@ export function useSocket() {
 
 export function useRTCTransfer() {
     // state
-    const [bitrate, setBitrate] = useState(0)
+    const [transferType, setTransferType] = useState<"upload" | "download">()
+    const [transferState, setTransferState] = useState<"starting" | "started" | "stopped">()
+    const [transferredSize, setTransferredSize] = useState(0)
+    const [bitrate, setBitrate] = useState<number | null>(null)
 
     // refs
     const localConnection = useRef<RTCPeerConnection>()
@@ -60,8 +54,9 @@ export function useRTCTransfer() {
     const sendChannel = useRef<RTCDataChannel>()
     const receiveChannel = useRef<RTCDataChannel>()
 
-    const receiveBuffer = useRef<any[]>()
-    const receiveSize = useRef<number>()
+    const receiveBuffer = useRef<any[]>([])
+    const receiveSize = useRef<number>(0)
+    const receivingFileDetails = useRef<FileDetails>()
 
     const bytesPrev = useRef(0)
     const timestampStart = useRef(0)
@@ -70,11 +65,14 @@ export function useRTCTransfer() {
 
     // functions
     async function createRemoteConnection(socketId: string) {
+        setTransferState("starting")
+        setTransferType("download")
+
         remoteConnection.current = new RTCPeerConnection()
-        console.log("Created remote peer connection")
+        console.log("[remote-rtc] Created remote peer connection")
 
         remoteConnection.current.addEventListener("icecandidate", async (e) => {
-            console.log("Remote ICE candidate: ", e.cancelable)
+            console.log("[remote-rtc] ICE candidate from remoteConnection: ", e.cancelable)
             socket.emit(SOCKET_EVENTS.SEND_ICE_CANDIDATE, { ice: e.candidate, to: socketId })
         })
 
@@ -82,25 +80,33 @@ export function useRTCTransfer() {
     }
 
     async function createLocalConnection(socketId: string, file: File) {
+        setTransferState("starting")
+        setTransferType("upload")
+
         localConnection.current = new RTCPeerConnection()
-        console.log("Created local peer connection")
+        console.log("[local-rtc] Created local peer connection")
 
         sendChannel.current = localConnection.current.createDataChannel("")
         sendChannel.current.binaryType = "arraybuffer"
-        console.log("Created send data channel")
+        console.log("[local-rtc] Created send data channel")
 
+        localConnection.current.addEventListener("connectionstatechange", (e) => {
+            if (!["connected", "new"].includes(localConnection.current?.connectionState as any)) {
+                setTransferState("stopped")
+            }
+        })
         sendChannel.current.addEventListener("open", () => onSendChannelStateChange(file))
         sendChannel.current.addEventListener("close", () => onSendChannelStateChange(file))
         sendChannel.current.addEventListener("error", (e) => onError(e))
 
         localConnection.current.addEventListener("icecandidate", async (e) => {
-            console.log("Local ICE candidate: ", e.cancelable)
+            console.log("[local-rtc] Local ICE candidate:", e.candidate)
             socket.emit(SOCKET_EVENTS.SEND_ICE_CANDIDATE, { ice: e.candidate, to: socketId })
         })
 
         const offer = await localConnection.current.createOffer()
         localConnection.current.setLocalDescription(offer)
-        console.log("Offer from localConnection: ", offer.sdp)
+        console.log("[local-rtc] Offer from localConnection: ", offer.sdp)
         socket.emit(SOCKET_EVENTS.SEND_OFFER, { offer, to: socketId })
     }
 
@@ -111,18 +117,22 @@ export function useRTCTransfer() {
         receiveChannel.current?.close()
         receiveChannel.current = undefined
 
-        console.log("Closed data channels")
+        console.log("[close-connections] Closed data channels")
 
         localConnection.current?.close()
         remoteConnection.current?.close()
 
         localConnection.current = undefined
         remoteConnection.current = undefined
-        console.log("Closed peer connections")
+        console.log("[close-connections] Closed peer connections")
+
+        setTransferState("stopped")
     }
 
     function sendData(file: File) {
-        console.log(`File is ${[file.name, file.size, file.type, file.lastModified].join(" ")}`)
+        console.log(
+            `[send-file] File is ${[file.name, file.size, file.type, file.lastModified].join(" ")}`
+        )
 
         if (file.size === 0) {
             // toast message
@@ -131,12 +141,20 @@ export function useRTCTransfer() {
             return
         }
 
+        // send file details
+        sendChannel.current?.send(
+            JSON.stringify({
+                fileName: file.name,
+                fileSize: file.size,
+            })
+        )
+
         const chunkSize = 16384
         let offset = 0
         let fileReader = new FileReader()
 
         const readSlice = (o: number) => {
-            console.log("readSlice: ", o)
+            console.log("[read-slice] readSlice: ", o)
             const slice = file.slice(offset, o + chunkSize)
             fileReader.readAsArrayBuffer(slice)
         }
@@ -144,9 +162,14 @@ export function useRTCTransfer() {
         fileReader.addEventListener("error", (error) => console.error("Error reading file:", error))
         fileReader.addEventListener("abort", (event) => console.log("File reading aborted:", event))
         fileReader.addEventListener("load", (e) => {
-            console.log("FileRead.onload", e)
+            console.log("[read-file] FileRead.onload", e)
+
+            setTransferState("started")
+
             sendChannel.current?.send(e.target?.result as string)
             offset += (e.target?.result as ArrayBuffer).byteLength
+
+            setTransferredSize(Math.floor((offset / file.size) * 100))
 
             if (offset < file.size) {
                 readSlice(offset)
@@ -158,53 +181,102 @@ export function useRTCTransfer() {
 
     // callbacks
     function receiveChannelCb(event: RTCDataChannelEvent) {
-        console.log("Receive Channel Callback")
+        console.log("[remote-channel] Receive Channel Callback")
         receiveChannel.current = event.channel
         receiveChannel.current.binaryType = "arraybuffer"
 
         receiveChannel.current.onmessage = onReceiveMessageCb
         receiveChannel.current.onopen = onReceiveChannelStateChange
         receiveChannel.current.onclose = onReceiveChannelStateChange
+        receiveChannel.current.onerror = onError
     }
 
     function onReceiveMessageCb(event: MessageEvent) {
-        console.log("Receive Message", event.data.byteLength)
+        if (typeof event.data === "string") {
+            console.log("[remote-channel] Receive file stats", event.data)
+            receivingFileDetails.current = JSON.parse(event.data)
+            return
+        }
+
+        transferState !== "started" && setTransferState("started")
+
+        console.log("[remote-channel] Receive Message", event.data.byteLength)
         receiveBuffer.current?.push(event.data)
         receiveSize.current += event.data.byteLength
 
+        setTransferredSize(
+            Math.floor((receiveSize.current / (receivingFileDetails.current?.fileSize || 0)) * 100)
+        )
+
         // track when download is complete
-        closeDataChannels()
+        // console.log(receivingFileDetails.current?.fileSize, receiveSize.current)
+        if (receivingFileDetails.current?.fileSize === receiveSize.current) {
+            console.log(receiveBuffer.current)
+            const received = new Blob(receiveBuffer.current)
+            receiveBuffer.current = []
+
+            dowloadUrl(URL.createObjectURL(received), receivingFileDetails.current.fileName)
+
+            const bitrate = Math.round(
+                (receiveSize.current * 8) / (new Date().getTime() - timestampStart.current)
+            )
+            toast.success(
+                `${receivingFileDetails.current.fileName} Downloaded (${bitrate} kbits/sec)`
+            )
+            console.log("[remote-channel] File downloaded in")
+
+            if (statsInterval.current) {
+                clearInterval(statsInterval.current)
+                statsInterval.current = null
+            }
+
+            closeDataChannels()
+        }
     }
 
     function onSendChannelStateChange(file: File) {
         if (!sendChannel.current) return
         const { readyState } = sendChannel.current
-        console.log(`Send channel state is: ${readyState}`)
+        console.log(`[local-channel] Send channel state is: ${readyState}`)
 
         if (readyState === "open") {
+            console.log("[local-channel] Send data")
             sendData(file)
+        }
+
+        if (readyState === "closed") {
+            setTransferState("stopped")
         }
     }
 
     function onError(error: any) {
-        if (sendChannel.current) {
-            console.error("Error in sendChannel:", error)
+        if (receiveChannel.current) {
+            console.error("[remote-channel] Error in receiveChannel:", error)
             return
         }
 
-        console.log("Error in sendChannel which is already closed:", error)
+        if (sendChannel.current) {
+            console.error("[local-channel] Error in sendChannel:", error)
+            return
+        }
+
+        console.log("[local-channel] Error in sendChannel which is already closed:", error)
     }
 
     async function onReceiveChannelStateChange() {
         if (!receiveChannel.current) return
         const readyState = receiveChannel.current.readyState
-        console.log(`Receive channel state is: ${readyState}`)
+        console.log(`[remote-channel] Receive channel state is: ${readyState}`)
 
         if (readyState === "open") {
             timestampStart.current = new Date().getTime()
             timestampPrev.current = timestampStart.current
             statsInterval.current = setInterval(displayStats, 500)
             await displayStats()
+        }
+
+        if (readyState === "closed") {
+            setTransferState("stopped")
         }
     }
 
@@ -235,6 +307,7 @@ export function useRTCTransfer() {
             )
 
             setBitrate(bitrate)
+            console.log(`[displayStats] Bitrate ${bitrate}`)
 
             timestampPrev.current = activeCandidatePair.timestamp
             bytesPrev.current = bytesNow
@@ -249,8 +322,10 @@ export function useRTCTransfer() {
                 await createRemoteConnection(socketId)
             }
 
-            console.log("Local ICE candidate: ", ice)
-            await remoteConnection.current?.addIceCandidate(ice)
+            if (ice) {
+                console.log("[remote-rtc] ICE candidate from localConnection:", ice)
+                await remoteConnection.current?.addIceCandidate(ice)
+            }
         })
 
         socket.on(SOCKET_EVENTS.RECEIVE_OFFER, async ({ offer, socketId }: any) => {
@@ -258,11 +333,12 @@ export function useRTCTransfer() {
                 await createRemoteConnection(socketId)
             }
 
+            console.log("[remote-rtc] Offer from localConnection: ", offer?.sdp)
             await remoteConnection.current?.setRemoteDescription(offer)
 
             const answer = await remoteConnection.current?.createAnswer()
             await remoteConnection.current?.setLocalDescription(answer!)
-            console.log("Answer from remoteConnection: ", answer?.sdp)
+            console.log("[remote-rtc] Answer from remoteConnection: ", answer?.sdp)
             socket.emit(SOCKET_EVENTS.SEND_ANSWER, { answer, to: socketId })
         })
     }, [])
@@ -270,19 +346,28 @@ export function useRTCTransfer() {
     // local socket listeners
     useEffect(() => {
         socket.on(SOCKET_EVENTS.RECEIVE_ICE_CANDIDATE, async (data: any) => {
+            if (remoteConnection.current) return
             if (data.ice) {
-                console.log("Remote ICE candidate: ", data.ice)
+                console.log("[local-rtc] Remote ICE candidate: ", data.ice)
                 localConnection.current?.addIceCandidate(data.ice)
             }
         })
 
         socket.on(SOCKET_EVENTS.RECEIVE_ANSWER, async ({ answer }: any) => {
+            if (remoteConnection.current) return
             await localConnection.current?.setRemoteDescription(answer)
-            console.log("Answer from remoteConnection: ", answer?.sdp)
+            console.log("[local-rtc] Answer from remoteConnection: ", answer?.sdp)
         })
     }, [])
 
     return {
+        // actions
         createLocalConnection,
+
+        // data
+        transferType,
+        transferredSize,
+        bitrate,
+        transferState,
     }
 }
