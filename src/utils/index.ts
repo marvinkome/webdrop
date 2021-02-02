@@ -83,48 +83,6 @@ export function getUserAvatar() {
     }
 }
 
-export function handleFileUpload(
-    file: File,
-    channel: RTCDataChannel,
-    connection: RTCPeerConnection,
-    onload: (offet: number) => void
-) {
-    console.log(`File is ${[file.name, file.size, file.type, file.lastModified].join(" ")}`)
-
-    if (file.size === 0) {
-        // toast message
-        console.log("File is empty")
-        channel.close()
-        connection.close()
-    }
-
-    const chunkSize = 16384
-    let offset = 0
-    let fileReader = new FileReader()
-
-    const readSlice = (o: number) => {
-        console.log("readSlice: ", o)
-        const slice = file.slice(offset, o + chunkSize)
-        fileReader.readAsArrayBuffer(slice)
-    }
-
-    fileReader.addEventListener("error", (error) => console.error("Error reading file:", error))
-    fileReader.addEventListener("abort", (event) => console.log("File reading aborted:", event))
-    fileReader.addEventListener("load", (e) => {
-        console.log("read complete", e.target?.result)
-        channel.send(e.target?.result as string)
-        offset += (e.target?.result as ArrayBuffer).byteLength
-        onload(offset)
-
-        if (offset < file.size) {
-            readSlice(offset)
-        }
-    })
-
-    readSlice(0)
-    return fileReader
-}
-
 export function dowloadUrl(url: string, name: string) {
     const a = document.createElement("a")
 
@@ -134,8 +92,9 @@ export function dowloadUrl(url: string, name: string) {
     a.click()
 }
 
-export function fileSize(bytes?: number) {
-    if (!bytes) return false
+export function fileSize(b?: number) {
+    if (!b) return false
+    let bytes = b * 1000
 
     var exp = (Math.log(bytes) / Math.log(1024)) | 0
     var result = (bytes / Math.pow(1024, exp)).toFixed(2)

@@ -1,5 +1,5 @@
 import { SOCKET_EVENTS } from "consts"
-import { dowloadUrl } from "utils"
+import { dowloadUrl, fileSize } from "utils"
 import { toast } from "react-toastify"
 import { useEffect, useRef, useState } from "react"
 import { io } from "socket.io-client"
@@ -221,7 +221,7 @@ export function useRTCTransfer() {
                 (receiveSize.current * 8) / (new Date().getTime() - timestampStart.current)
             )
             toast.success(
-                `${receivingFileDetails.current.fileName} Downloaded (${bitrate} kbits/sec)`
+                `${receivingFileDetails.current.fileName} - Speed (${fileSize(bitrate)}bits/sec)`
             )
             console.log("[remote-channel] File downloaded in")
 

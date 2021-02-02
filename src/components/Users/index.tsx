@@ -3,6 +3,7 @@ import styles from "./styles.module.scss"
 import { ChangeEvent, useRef } from "react"
 import { CircularProgressbarWithChildren } from "react-circular-progressbar"
 import { MdCheck } from "react-icons/md"
+import { fileSize } from "utils"
 
 export function User({ avatar, name }: { avatar: string; name: string }) {
     return (
@@ -89,7 +90,7 @@ export function Peer({ avatar, name, onSelectFile, transferData }: PeerProps) {
                 {transferData.transferState !== "started"
                     ? name
                     : transferData.transferType === "download"
-                    ? `${transferData.bitrate} kbits/sec`
+                    ? `${fileSize(transferData.bitrate || 0)}bits/sec`
                     : name}
             </span>
 
