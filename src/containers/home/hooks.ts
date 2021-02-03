@@ -69,7 +69,8 @@ export function useRTCTransfer() {
         setTransferState("starting")
         setTransferType("download")
 
-        remoteConnection.current = new RTCPeerConnection()
+        const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }
+        remoteConnection.current = new RTCPeerConnection(configuration)
         console.log("[remote-rtc] Created remote peer connection")
 
         remoteConnection.current.addEventListener("icecandidate", async (e) => {
@@ -84,7 +85,8 @@ export function useRTCTransfer() {
         setTransferState("starting")
         setTransferType("upload")
 
-        localConnection.current = new RTCPeerConnection()
+        const configuration = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] }
+        localConnection.current = new RTCPeerConnection(configuration)
         console.log("[local-rtc] Created local peer connection")
 
         sendChannel.current = localConnection.current.createDataChannel("")
