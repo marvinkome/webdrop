@@ -1,4 +1,3 @@
-import os from "os"
 import express from "express"
 import { createServer } from "http"
 import next from "next"
@@ -18,9 +17,6 @@ nextApp.prepare().then(() => {
     })
 
     server.listen(3000, () => {
-        const networkInterface = os.networkInterfaces()
-        const ip = networkInterface["en0"] ? networkInterface["en0"][1].address : ""
-
-        console.log(`Ready! on ${ip}:3000`)
+        console.log(`Ready! on localhost:3000`)
     })
 })
