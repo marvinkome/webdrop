@@ -54,6 +54,7 @@ export function useRTCTransfer() {
     const sendChannel = useRef<RTCDataChannel>()
     const receiveChannel = useRef<RTCDataChannel>()
 
+    const channelOpen = useRef(false)
     const receiveBuffer = useRef<any[]>([])
     const receiveSize = useRef<number>(0)
     const receivingFileDetails = useRef<FileDetails>()
@@ -162,8 +163,9 @@ export function useRTCTransfer() {
         fileReader.addEventListener("error", (error) => console.error("Error reading file:", error))
         fileReader.addEventListener("abort", (event) => console.log("File reading aborted:", event))
         fileReader.addEventListener("load", (e) => {
-            console.log("[read-file] FileRead.onload", e)
+            if (!channelOpen.current) return
 
+            console.log("[read-file] FileRead.onload", e)
             setTransferState("started")
 
             sendChannel.current?.send(e.target?.result as string)
@@ -238,6 +240,7 @@ export function useRTCTransfer() {
         if (!sendChannel.current) return
         const { readyState } = sendChannel.current
         console.log(`[local-channel] Send channel state is: ${readyState}`)
+        channelOpen.current = readyState === "open"
 
         if (readyState === "open") {
             console.log("[local-channel] Send data")
