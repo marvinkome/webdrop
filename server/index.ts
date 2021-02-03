@@ -16,7 +16,7 @@ nextApp.prepare().then(() => {
         return handle(req, res)
     })
 
-    server.listen(3000, () => {
+    server.listen(process.env.PORT || 3000, () => {
         console.log(`Ready! on localhost:3000`)
     })
 })
