@@ -100,3 +100,30 @@ export function fileSize(b?: number) {
     var result = (bytes / Math.pow(1024, exp)).toFixed(2)
     return result + (exp == 0 ? "bytes" : "KMGTPEZY"[exp - 1])
 }
+
+export function chunkFile(file: File, onSplit: (e: ProgressEvent<FileReader>) => void) {
+    const chunkSize = 16384
+
+    let offset = 0
+    let fileReader = new FileReader()
+
+    const readSlice = (o: number) => {
+        console.log("[chunkFile] readSlice: ", o)
+        const slice = file.slice(offset, o + chunkSize)
+        fileReader.readAsArrayBuffer(slice)
+    }
+
+    fileReader.addEventListener("error", (error) => console.error("Error reading file:", error))
+    fileReader.addEventListener("abort", (event) => console.log("File reading aborted:", event))
+    fileReader.addEventListener("load", (e) => {
+        console.log("[read-file] FileRead.onload", e)
+        onSplit(e)
+
+        offset += (e.target?.result as ArrayBuffer).byteLength
+        if (offset < file.size) {
+            readSlice(offset)
+        }
+    })
+
+    return readSlice
+}

@@ -3,6 +3,7 @@ import { toast } from "react-toastify"
 import { SOCKET_EVENTS } from "consts"
 import { useEffect, useState, useRef } from "react"
 import { io } from "socket.io-client"
+import { FileBuilder, FileSplitter } from "utils/file"
 
 export type User = {
     name: string
@@ -21,6 +22,7 @@ export function usePeers() {
             setSocketId(socket.id)
             import("peerjs").then(({ default: PeerJS }) => {
                 setPeer(new PeerJS(socket.id))
+                console.log("Connection to server established")
             })
         })
 
@@ -41,9 +43,8 @@ export function usePeers() {
 }
 
 export function useTransfer(peerConn?: Peer) {
-    const [transferredSize, setTransferredSize] = useState(0)
-
     const dataConn = useRef<Peer.DataConnection>()
+    const fileBuilder = useRef<FileBuilder>()
 
     function sendFile(file: File) {
         console.log(
@@ -57,39 +58,26 @@ export function useTransfer(peerConn?: Peer) {
             return
         }
 
-        dataConn.current?.send(
-            JSON.stringify({
-                fileName: file.name,
-                fileSize: file.size,
-            })
-        )
+        const fileDetails = JSON.stringify({
+            fileName: file.name,
+            fileSize: file.size,
+        })
+        dataConn.current?.send(fileDetails)
 
-        const chunkSize = 16384
-        let offset = 0
-        let fileReader = new FileReader()
+        new FileSplitter(file, {
+            onFileSplit: (chunk) => dataConn.current?.send(chunk),
+            onOffsetUpdated: () => null,
+        })
+    }
 
-        const readSlice = (o: number) => {
-            console.log("[read-slice] readSlice: ", o)
-            const slice = file.slice(offset, o + chunkSize)
-            fileReader.readAsArrayBuffer(slice)
+    function receiveFile(data: any) {
+        if (typeof data === "string") {
+            console.log("[receiveFile] Receive file details", data)
+            fileBuilder.current = new FileBuilder(JSON.parse(data))
+            return
         }
 
-        fileReader.addEventListener("error", (error) => console.error("Error reading file:", error))
-        fileReader.addEventListener("abort", (event) => console.log("File reading aborted:", event))
-        fileReader.addEventListener("load", (e) => {
-            console.log("[read-file] FileRead.onload", e)
-
-            dataConn.current?.send(e.target?.result as string)
-            offset += (e.target?.result as ArrayBuffer).byteLength
-
-            setTransferredSize(Math.floor((offset / file.size) * 100))
-
-            if (offset < file.size) {
-                readSlice(offset)
-            }
-        })
-
-        readSlice(0)
+        fileBuilder.current?.addChunk(data)
     }
 
     async function createConnection(peerId: string, file?: File) {
@@ -120,10 +108,7 @@ export function useTransfer(peerConn?: Peer) {
             dataConn.current = conn
 
             conn.on("open", () => {
-                conn.on("data", (data) => {
-                    // use data from sender
-                    console.log(data)
-                })
+                conn.on("data", receiveFile)
             })
         })
     }, [peerConn])
