@@ -100,7 +100,7 @@ export function useTransfer(peerConn?: Peer) {
         )
     }
 
-    async function createConnection(peerId: string, file?: File) {
+    function createConnection(peerId: string, file?: File) {
         if (!peerConn) {
             console.log("[useTransfer] client PeerJS connected to server")
             return
