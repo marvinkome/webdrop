@@ -53,11 +53,12 @@ export class FileBuilder {
         this.fileDetails = details
     }
 
-    addChunk(chunk: ArrayBuffer, onComplete: () => void) {
+    addChunk(chunk: ArrayBuffer, onAddChunk: (size: number) => void, onComplete: () => void) {
         console.log("[FileBuilder.addChunk] receive buffer", chunk.byteLength)
 
         this.chunkSize += chunk.byteLength
         this.chunks.push(chunk)
+        onAddChunk(Math.floor((this.chunkSize / this.fileDetails.fileSize) * 100))
 
         if (this.chunkSize >= this.fileDetails.fileSize) {
             console.log("[FileBuilder] File ready for download")

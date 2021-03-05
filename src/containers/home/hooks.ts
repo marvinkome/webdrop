@@ -45,6 +45,7 @@ export function usePeers() {
 export function useTransfer(peerConn?: Peer) {
     const [transferType, setTransferType] = useState<"upload" | "download">()
     const [transferState, setTransferState] = useState<"starting" | "started" | "stopped">()
+    const [transferredSize, setTransferredSize] = useState(0)
 
     const dataConn = useRef<Peer.DataConnection>()
     const fileBuilder = useRef<FileBuilder>()
@@ -73,6 +74,7 @@ export function useTransfer(peerConn?: Peer) {
                 dataConn.current?.send(chunk)
             },
             onOffsetUpdated: (offset) => {
+                setTransferredSize(Math.floor((offset / file.size) * 100))
                 if (offset >= file.size) setTransferState("stopped")
             },
         })
@@ -85,10 +87,17 @@ export function useTransfer(peerConn?: Peer) {
             return
         }
 
-        setTransferState("started")
-        fileBuilder.current?.addChunk(data, () => {
-            setTransferState("stopped")
-        })
+        if (transferState !== "started") setTransferState("started")
+
+        fileBuilder.current?.addChunk(
+            data,
+            (size) => {
+                setTransferredSize(size)
+            },
+            () => {
+                setTransferState("stopped")
+            }
+        )
     }
 
     async function createConnection(peerId: string, file?: File) {
@@ -134,5 +143,6 @@ export function useTransfer(peerConn?: Peer) {
 
         transferType,
         transferState,
+        transferredSize,
     }
 }
