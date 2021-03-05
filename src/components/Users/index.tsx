@@ -82,7 +82,7 @@ export function Peer({ avatar, name, onSelectFile, transferData }: PeerProps) {
                 styles={circularProgressStyles}
                 value={transferData.transferredSize}
             >
-                <img src={avatar} alt={name} onClick={() => fileInputRef.current?.click()} />
+                <img src={avatar} alt={name} />
             </CircularProgressbarWithChildren>
         )
     }

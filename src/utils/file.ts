@@ -34,6 +34,7 @@ export class FileSplitter {
             events.onFileSplit(e.target?.result)
 
             this.offset += (e.target?.result as ArrayBuffer).byteLength
+            events.onOffsetUpdated(this.offset)
 
             if (this.offset < this.file.size) {
                 this.readSlice(this.offset)
@@ -52,7 +53,7 @@ export class FileBuilder {
         this.fileDetails = details
     }
 
-    addChunk(chunk: ArrayBuffer) {
+    addChunk(chunk: ArrayBuffer, onComplete: () => void) {
         console.log("[FileBuilder.addChunk] receive buffer", chunk.byteLength)
 
         this.chunkSize += chunk.byteLength
@@ -63,6 +64,7 @@ export class FileBuilder {
 
             const fileBlob = new Blob(this.chunks)
             dowloadUrl(URL.createObjectURL(fileBlob), this.fileDetails.fileName)
+            onComplete()
         }
     }
 }

@@ -43,6 +43,9 @@ export function usePeers() {
 }
 
 export function useTransfer(peerConn?: Peer) {
+    const [transferType, setTransferType] = useState<"upload" | "download">()
+    const [transferState, setTransferState] = useState<"starting" | "started" | "stopped">()
+
     const dataConn = useRef<Peer.DataConnection>()
     const fileBuilder = useRef<FileBuilder>()
 
@@ -65,8 +68,13 @@ export function useTransfer(peerConn?: Peer) {
         dataConn.current?.send(fileDetails)
 
         new FileSplitter(file, {
-            onFileSplit: (chunk) => dataConn.current?.send(chunk),
-            onOffsetUpdated: () => null,
+            onFileSplit: (chunk) => {
+                if (transferState !== "started") setTransferState("started")
+                dataConn.current?.send(chunk)
+            },
+            onOffsetUpdated: (offset) => {
+                if (offset >= file.size) setTransferState("stopped")
+            },
         })
     }
 
@@ -77,7 +85,10 @@ export function useTransfer(peerConn?: Peer) {
             return
         }
 
-        fileBuilder.current?.addChunk(data)
+        setTransferState("started")
+        fileBuilder.current?.addChunk(data, () => {
+            setTransferState("stopped")
+        })
     }
 
     async function createConnection(peerId: string, file?: File) {
@@ -91,8 +102,11 @@ export function useTransfer(peerConn?: Peer) {
             return
         }
 
+        setTransferType("upload")
         dataConn.current = peerConn.connect(peerId)
         dataConn.current.on("open", () => {
+            setTransferState("starting")
+
             // send file to receiver
             sendFile(file)
         })
@@ -105,9 +119,11 @@ export function useTransfer(peerConn?: Peer) {
         }
 
         peerConn.on("connection", (conn) => {
+            setTransferType("upload")
             dataConn.current = conn
 
             conn.on("open", () => {
+                setTransferState("starting")
                 conn.on("data", receiveFile)
             })
         })
@@ -115,5 +131,8 @@ export function useTransfer(peerConn?: Peer) {
 
     return {
         createConnection,
+
+        transferType,
+        transferState,
     }
 }
