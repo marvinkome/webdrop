@@ -125,10 +125,9 @@ export function useTransfer(peerConn?: Peer) {
         if (!peerConn) {
             console.log("[connectionListener] peerConn not yet available")
             return
-        } else {
-            console.log("[connectionListener] peerConn available")
         }
 
+        console.log("[connectionListener] peerConn available")
         peerConn.on("connection", (conn) => {
             setTransferType("download")
             dataConn.current = conn
