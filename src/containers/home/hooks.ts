@@ -21,7 +21,7 @@ export function usePeers() {
         socket.on("connect", async () => {
             setSocketId(socket.id)
             import("peerjs").then(({ default: PeerJS }) => {
-                setPeer(new PeerJS(socket.id))
+                setPeer(new PeerJS(socket.id, { secure: false }))
                 console.log("Connection to server established")
             })
         })
