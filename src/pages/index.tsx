@@ -1,15 +1,5 @@
-import { Button } from "@chakra-ui/button"
-import {
-    Box,
-    Container,
-    Flex,
-    Heading,
-    HStack,
-    Link,
-    Text,
-    useMediaQuery,
-    VStack,
-} from "@chakra-ui/react"
+import { Box, Container, Flex, Heading, HStack, Link, Text, VStack } from "@chakra-ui/react"
+import { FilePicker } from "components/file-picker"
 import React from "react"
 
 function Header() {
@@ -33,34 +23,6 @@ function Header() {
                 </Link>
             </HStack>
         </Flex>
-    )
-}
-
-function FilePicker() {
-    const [isSmallScreen] = useMediaQuery("(max-width: 425px)")
-
-    return isSmallScreen ? (
-        <Box p={5}>
-            <Button fontWeight="normal" mt={5} colorScheme="primary" size="lg">
-                Browse Files
-            </Button>
-        </Box>
-    ) : (
-        <Box mt={10} p={5} boxShadow="dark-lg" rounded="2xl" bg="gray.700">
-            <Box
-                rounded="lg"
-                borderWidth={2}
-                borderColor="primary.100"
-                borderStyle="dashed"
-                py={{ base: 5, md: 16 }}
-                px={{ base: 20, md: 32 }}
-            >
-                <Text>Drag & Drop files here to send</Text>
-                <Button fontWeight="normal" mt={5} variant="outline">
-                    Browse Files
-                </Button>
-            </Box>
-        </Box>
     )
 }
 
