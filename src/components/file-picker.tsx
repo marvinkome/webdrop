@@ -65,7 +65,7 @@ function useDragAndDrop(elementRef: React.MutableRefObject<HTMLDivElement | null
     }
 }
 
-export function FilePicker() {
+export const FilePicker: React.FC<{ onSelectFile: (file: File) => void }> = (props) => {
     const [isSmallScreen] = useMediaQuery("(max-width: 425px)")
     const fileInputRef = React.useRef<HTMLInputElement | null>(null)
     const dropRef = React.useRef<HTMLDivElement | null>(null)
@@ -74,7 +74,7 @@ export function FilePicker() {
     React.useEffect(() => {
         if (files?.length) {
             const file = files[0]
-            console.log(file)
+            props.onSelectFile(file)
         }
     }, [files])
 
@@ -85,9 +85,7 @@ export function FilePicker() {
         const files = e.target.files || []
         const file = files[0]
 
-        console.log("from change event", file)
-
-        // onSelectFile(file)
+        props.onSelectFile(file)
     }, [])
 
     return (
