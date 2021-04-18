@@ -15,6 +15,7 @@ function MyApp({ Component, pageProps }: AppProps) {
 
                 <title>WebDrop</title>
             </Head>
+
             <Component {...pageProps} />
         </ChakraProvider>
     )

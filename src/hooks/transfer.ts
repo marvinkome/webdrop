@@ -1,13 +1,15 @@
 import Peer from "peerjs"
-import { useState, useEffect } from "react"
-import { useToast } from "@chakra-ui/toast"
-import { FileSplitter } from "utils/file"
+import { useState, useEffect, useRef } from "react"
+import { useToast } from "@chakra-ui/react"
+import { fileSplitterCreator } from "utils/file"
 import { setupPeerJS } from "utils"
 
-export function useFileTransfer(peer: Peer | null, file: File | null) {
+export function useFileTransfer(peer?: Peer, file?: File) {
     const [transferStarted, setTransferStarted] = useState(false)
     const [transferCompleted, setTransferCompleted] = useState(false)
     const [transferedSize, setTransferredSize] = useState(0)
+
+    const fileSplitter = useRef<ReturnType<typeof fileSplitterCreator>>()
 
     function transferFile(dataConn: Peer.DataConnection) {
         if (!file) return
@@ -21,30 +23,34 @@ export function useFileTransfer(peer: Peer | null, file: File | null) {
         dataConn.send(fileDetails)
 
         // send file
-        new FileSplitter(file, {
-            onFileSplit: (chunk) => {
-                setTransferStarted(true)
-                dataConn.send(chunk)
-            },
-            onOffsetUpdated: (offset) => {
-                setTransferredSize(Math.floor((offset / file.size) * 100))
-                if (offset >= file.size) {
-                    setTransferStarted(false)
-                    setTransferCompleted(true)
-                }
-            },
+        fileSplitter.current = fileSplitterCreator(file)
+        fileSplitter.current?.start()
+
+        // add listeners
+        fileSplitter.current?.addEventListener("split-file", (e: any) => {
+            setTransferStarted(true)
+            dataConn.send(e.detail.chunk)
+        })
+
+        fileSplitter.current?.addEventListener("update-offset", (e: any) => {
+            const offset = e.detail.offset
+
+            setTransferredSize(Math.floor((offset / file.size) * 100))
+            if (offset >= file.size) {
+                setTransferStarted(false)
+                setTransferCompleted(true)
+            }
         })
     }
 
     useEffect(() => {
+        if (!peer) return
+
         const onConnection = (dataConn: Peer.DataConnection) => {
             dataConn.on("open", () => transferFile(dataConn))
         }
 
-        peer?.on("connection", onConnection)
-        return () => {
-            peer?.off("connection", onConnection)
-        }
+        peer.on("connection", onConnection)
     }, [peer, file])
 
     return {
@@ -56,8 +62,8 @@ export function useFileTransfer(peer: Peer | null, file: File | null) {
 
 export function useTransferSetup() {
     const toast = useToast({ position: "top-right", isClosable: true })
-    const [file, setFile] = useState<File | null>(null)
-    const [peer, setPeer] = useState<Peer | null>(null)
+    const [file, setFile] = useState<File>()
+    const [peer, setPeer] = useState<Peer>()
 
     const onSelectFile = async (file: File) => {
         if (file.size === 0) {
@@ -65,12 +71,10 @@ export function useTransferSetup() {
             return
         }
 
-        setFile(file)
-
         const peer = await setupPeerJS()
-        setPeer(peer)
 
-        console.log("Connection to peer server established")
+        setFile(file)
+        setPeer(peer)
     }
 
     return {

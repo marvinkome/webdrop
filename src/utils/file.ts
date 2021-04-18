@@ -1,47 +1,72 @@
 import { dowloadUrl } from "utils"
 
-// TODO:: refactor to use events
-export class FileSplitter {
-    CHUNK_SIZE = 16384
+// I'm doing this because EventTarget doens't exist on server side
+export function fileSplitterCreator(file: File) {
+    if (typeof window === "undefined") return
 
-    offset: number = 0
-    fileReader = new FileReader()
-    file: File
+    class FileSplitter extends EventTarget {
+        CHUNK_SIZE = 16384
 
-    constructor(
-        file: File,
-        events: { onFileSplit: (res: any) => void; onOffsetUpdated: (newOffset: number) => void }
-    ) {
-        this.file = file
-        this.start(events)
+        offset: number = 0
+        fileReader = new FileReader()
+        file: File
+
+        paused: boolean = false
+
+        constructor(file: File) {
+            super()
+
+            this.file = file
+
+            // add event listener for fileReader
+            this.fileReader.addEventListener("load", (e) => {
+                console.log("[read-file] FileRead.onload", e)
+                this.dispatchEvent(
+                    new CustomEvent("split-file", {
+                        detail: { chunk: e.target?.result },
+                    })
+                )
+
+                this.offset += (e.target?.result as ArrayBuffer).byteLength
+                this.dispatchEvent(
+                    new CustomEvent("update-offset", {
+                        detail: { offset: this.offset },
+                    })
+                )
+
+                if (!this.paused && this.offset < this.file.size) {
+                    this.readSlice(this.offset)
+                }
+            })
+        }
+
+        readSlice(offset: number) {
+            console.log("[FileSplitter] readSlice: ", offset)
+
+            const slice = this.file.slice(this.offset, offset + this.CHUNK_SIZE)
+            this.fileReader.readAsArrayBuffer(slice)
+        }
+
+        start() {
+            this.readSlice(0)
+            this.dispatchEvent(new Event("start"))
+        }
+
+        pause() {
+            this.paused = true
+            this.dispatchEvent(new Event("pause"))
+        }
+
+        resume() {
+            this.paused = false
+            this.dispatchEvent(new Event("resume"))
+
+            // resume reading from file
+            this.readSlice(this.offset)
+        }
     }
 
-    readSlice = (offset: number) => {
-        console.log("[FileSplitter] readSlice: ", offset)
-
-        const slice = this.file.slice(this.offset, offset + this.CHUNK_SIZE)
-        this.fileReader.readAsArrayBuffer(slice)
-    }
-
-    start = (events: {
-        onFileSplit: (res: any) => void
-        onOffsetUpdated: (newOffset: number) => void
-    }) => {
-        this.readSlice(0)
-
-        this.fileReader.addEventListener("load", (e) => {
-            console.log("[read-file] FileRead.onload", e)
-
-            events.onFileSplit(e.target?.result)
-
-            this.offset += (e.target?.result as ArrayBuffer).byteLength
-            events.onOffsetUpdated(this.offset)
-
-            if (this.offset < this.file.size) {
-                this.readSlice(this.offset)
-            }
-        })
-    }
+    return new FileSplitter(file)
 }
 
 export class FileBuilder {

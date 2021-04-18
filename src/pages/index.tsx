@@ -6,19 +6,19 @@ import { FileInfo } from "components/file-info"
 import { TransferDetails } from "components/transfer-details"
 
 export default function HomePage() {
-    const setupData = useTransferSetup()
-    const transferState = useFileTransfer(setupData.peer, setupData.file)
+    const { file, peer, onSelectFile } = useTransferSetup()
+    const transferState = useFileTransfer(peer, file)
 
-    let body = <FilePicker onSelectFile={setupData.onSelectFile} />
+    let body = <FilePicker onSelectFile={onSelectFile} />
 
-    if (setupData.file && setupData.peer) {
-        body = <FileInfo file={setupData.file} code={setupData.peer.id} />
+    if (file && peer) {
+        body = <FileInfo file={file} code={peer.id} />
     }
 
-    if (transferState.transferStarted && setupData.file) {
+    if (transferState.transferStarted && file) {
         body = (
             <TransferDetails
-                fileInfo={{ name: setupData.file.name, size: setupData.file.size }}
+                fileInfo={{ name: file.name, size: file.size }}
                 transferData={{
                     started: transferState.transferStarted,
                     completed: transferState.transferCompleted,
