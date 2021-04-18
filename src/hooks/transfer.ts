@@ -1,11 +1,8 @@
 import Peer from "peerjs"
-import { customAlphabet } from "nanoid"
 import { useState, useEffect } from "react"
 import { useToast } from "@chakra-ui/toast"
 import { FileSplitter } from "utils/file"
-
-const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-const nanoid = customAlphabet(alphabet, 6)
+import { setupPeerJS } from "utils"
 
 export function useFileTransfer(peer: Peer | null, file: File | null) {
     const [transferStarted, setTransferStarted] = useState(false)
@@ -70,15 +67,7 @@ export function useTransferSetup() {
 
         setFile(file)
 
-        const { default: PeerJS } = await import("peerjs")
-        const code = nanoid()
-        const options: any = {}
-
-        if (process.env.NODE_ENV !== "production") {
-            options.debug = 3
-        }
-
-        const peer = new PeerJS(code, options)
+        const peer = await setupPeerJS()
         setPeer(peer)
 
         console.log("Connection to peer server established")
