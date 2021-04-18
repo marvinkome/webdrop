@@ -20,7 +20,7 @@ export function fileSplitterCreator(file: File) {
 
             // add event listener for fileReader
             this.fileReader.addEventListener("load", (e) => {
-                console.log("[read-file] FileRead.onload", e)
+                // console.log("[read-file] FileRead.onload", e)
                 this.dispatchEvent(
                     new CustomEvent("split-file", {
                         detail: { chunk: e.target?.result },
@@ -41,8 +41,7 @@ export function fileSplitterCreator(file: File) {
         }
 
         readSlice(offset: number) {
-            console.log("[FileSplitter] readSlice: ", offset)
-
+            // console.log("[FileSplitter] readSlice: ", offset)
             const slice = this.file.slice(this.offset, offset + this.CHUNK_SIZE)
             this.fileReader.readAsArrayBuffer(slice)
         }
@@ -69,29 +68,44 @@ export function fileSplitterCreator(file: File) {
     return new FileSplitter(file)
 }
 
-export class FileBuilder {
-    fileDetails: { fileName: string; fileSize: number }
+export function fileBuilderCreator(details: { fileName: string; fileSize: number }) {
+    if (typeof window === "undefined") return
 
-    chunks: ArrayBuffer[] = []
-    chunkSize: number = 0
+    class FileBuilder extends EventTarget {
+        fileDetails: { fileName: string; fileSize: number }
 
-    constructor(details: { fileName: string; fileSize: number }) {
-        this.fileDetails = details
-    }
+        chunks: ArrayBuffer[] = []
+        chunkSize: number = 0
 
-    addChunk(chunk: ArrayBuffer, onAddChunk: (size: number) => void, onComplete: () => void) {
-        console.log("[FileBuilder.addChunk] receive buffer", chunk.byteLength)
+        constructor(details: { fileName: string; fileSize: number }) {
+            super()
+            this.fileDetails = details
+        }
 
-        this.chunkSize += chunk.byteLength
-        this.chunks.push(chunk)
-        onAddChunk(Math.floor((this.chunkSize / this.fileDetails.fileSize) * 100))
+        addChunk(chunk: ArrayBuffer) {
+            console.log("[FileBuilder.addChunk] receive buffer", chunk.byteLength)
 
-        if (this.chunkSize >= this.fileDetails.fileSize) {
-            console.log("[FileBuilder] File ready for download")
+            this.chunkSize += chunk.byteLength
+            this.chunks.push(chunk)
 
-            const fileBlob = new Blob(this.chunks)
-            dowloadUrl(URL.createObjectURL(fileBlob), this.fileDetails.fileName)
-            onComplete()
+            this.dispatchEvent(
+                new CustomEvent("add-chunk", {
+                    detail: {
+                        chunkSize: Math.floor((this.chunkSize / this.fileDetails.fileSize) * 100),
+                    },
+                })
+            )
+
+            if (this.chunkSize >= this.fileDetails.fileSize) {
+                console.log("[FileBuilder] File ready for download")
+
+                const fileBlob = new Blob(this.chunks)
+                dowloadUrl(URL.createObjectURL(fileBlob), this.fileDetails.fileName)
+
+                this.dispatchEvent(new Event("complete"))
+            }
         }
     }
+
+    return new FileBuilder(details)
 }

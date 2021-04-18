@@ -1,6 +1,6 @@
 import { customAlphabet } from "nanoid"
 
-const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+const alphabet = "123456789ABCDEFGHIJKLMNPQRSTUVWXYZ"
 const nanoid = customAlphabet(alphabet, 6)
 
 export function dowloadUrl(url: string, name: string) {

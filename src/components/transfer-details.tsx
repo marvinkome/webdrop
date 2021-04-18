@@ -19,6 +19,7 @@ type Props = {
         started: boolean
         completed: boolean
         transferredSize: number
+        bitrate?: number
     }
 }
 export const TransferDetails: React.FC<Props> = (props) => {
@@ -49,7 +50,7 @@ export const TransferDetails: React.FC<Props> = (props) => {
                             {props.transferData.transferredSize}%
                         </Text>
                         <Text fontWeight="500" fontSize="sm">
-                            4.2 mb/s
+                            {prettyBytes(props.transferData.bitrate || 0)}/s
                         </Text>
                     </CircularProgressLabel>
                 </CircularProgress>

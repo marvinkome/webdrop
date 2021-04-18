@@ -1,7 +1,8 @@
 import Peer from "peerjs"
 import React, { useState, useEffect, useRef } from "react"
 import { setupPeerJS } from "utils"
-import { FileBuilder } from "utils/file"
+import { fileBuilderCreator } from "utils/file"
+import { useBitrate } from "./bitrate"
 
 export function useReceiveFile(dataConn?: Peer.DataConnection) {
     const [fileInfo, setFileInfo] = useState<{ name: string; size: number }>()
@@ -10,7 +11,8 @@ export function useReceiveFile(dataConn?: Peer.DataConnection) {
     const [transferCompleted, setTransferCompleted] = useState(false)
     const [transferedSize, setTransferredSize] = useState(0)
 
-    const fileBuilder = useRef<FileBuilder>()
+    const bitrateObj = useBitrate()
+    const fileBuilder = useRef<ReturnType<typeof fileBuilderCreator>>()
 
     function receiveFile(data: any) {
         if (typeof data === "string") {
@@ -18,31 +20,41 @@ export function useReceiveFile(dataConn?: Peer.DataConnection) {
             const parsedData = JSON.parse(data)
 
             setFileInfo({ name: parsedData.fileName, size: parsedData.fileSize })
-            fileBuilder.current = new FileBuilder(parsedData)
+
+            fileBuilder.current = fileBuilderCreator(parsedData)
+            fileBuilder.current?.addEventListener("add-chunk", (e: any) => {
+                setTransferredSize(e.detail.chunkSize)
+            })
+
+            fileBuilder.current?.addEventListener("complete", () => {
+                setTransferStarted(false)
+                setTransferCompleted(true)
+
+                bitrateObj.cancel()
+                dataConn?.close()
+            })
+
             return
         }
 
         if (!transferStarted) setTransferStarted(true)
-        fileBuilder.current?.addChunk(
-            data,
-            (size) => {
-                setTransferredSize(size)
-            },
-            () => {
-                setTransferStarted(false)
-                setTransferCompleted(true)
-            }
-        )
+        fileBuilder.current?.addChunk(data)
     }
 
     useEffect(() => {
-        dataConn?.on("open", () => {
-            console.log("connection opened")
+        dataConn?.on("open", async () => {
+            bitrateObj.init(dataConn?.peerConnection!)
             dataConn?.on("data", receiveFile)
         })
     }, [dataConn])
 
-    return { fileInfo, transferCompleted, transferStarted, transferedSize }
+    return {
+        fileInfo,
+        transferCompleted,
+        transferStarted,
+        transferedSize,
+        bitrate: bitrateObj.bitrate,
+    }
 }
 
 export function useConnectionSetup() {

@@ -3,12 +3,14 @@ import { useState, useEffect, useRef } from "react"
 import { useToast } from "@chakra-ui/react"
 import { fileSplitterCreator } from "utils/file"
 import { setupPeerJS } from "utils"
+import { useBitrate } from "./bitrate"
 
 export function useFileTransfer(peer?: Peer, file?: File) {
     const [transferStarted, setTransferStarted] = useState(false)
     const [transferCompleted, setTransferCompleted] = useState(false)
     const [transferedSize, setTransferredSize] = useState(0)
 
+    const bitrateObj = useBitrate()
     const fileSplitter = useRef<ReturnType<typeof fileSplitterCreator>>()
 
     function transferFile(dataConn: Peer.DataConnection) {
@@ -47,7 +49,13 @@ export function useFileTransfer(peer?: Peer, file?: File) {
         if (!peer) return
 
         const onConnection = (dataConn: Peer.DataConnection) => {
-            dataConn.on("open", () => transferFile(dataConn))
+            dataConn.on("open", async () => {
+                console.log(dataConn.peerConnection)
+                await bitrateObj.init(dataConn.peerConnection)
+                transferFile(dataConn)
+            })
+
+            dataConn.on("close", bitrateObj.cancel)
         }
 
         peer.on("connection", onConnection)
@@ -57,6 +65,7 @@ export function useFileTransfer(peer?: Peer, file?: File) {
         transferStarted,
         transferCompleted,
         transferedSize,
+        bitrate: bitrateObj.bitrate,
     }
 }
 

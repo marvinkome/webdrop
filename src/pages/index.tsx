@@ -23,6 +23,7 @@ export default function HomePage() {
                     started: transferState.transferStarted,
                     completed: transferState.transferCompleted,
                     transferredSize: transferState.transferedSize,
+                    bitrate: transferState.bitrate,
                 }}
             />
         )
