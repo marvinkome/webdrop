@@ -1,5 +1,9 @@
 import sample from "lodash/sample"
 import startCase from "lodash/startCase"
+import { customAlphabet } from "nanoid"
+
+const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+const nanoid = customAlphabet(alphabet, 6)
 
 const AVATARS = [
     { name: "Bird", image: "1" },
@@ -117,4 +121,16 @@ export function chunkFile(file: File, onSplit: (e: ProgressEvent<FileReader>) =>
     })
 
     return readSlice
+}
+
+export async function setupPeerJS() {
+    const { default: PeerJS } = await import("peerjs")
+    const code = nanoid()
+
+    const options: any = {}
+    if (process.env.NODE_ENV !== "production") {
+        options.debug = 2
+    }
+
+    return new PeerJS(code, options)
 }

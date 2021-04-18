@@ -1,5 +1,6 @@
 import { dowloadUrl } from "utils"
 
+// TODO:: refactor to use events
 export class FileSplitter {
     CHUNK_SIZE = 16384
 
