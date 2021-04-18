@@ -47,4 +47,12 @@ export const theme = extendTheme({
             },
         },
     },
+
+    components: {
+        Button: {
+            baseStyle: {
+                fontWeight: "500",
+            },
+        },
+    },
 })

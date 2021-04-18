@@ -1,5 +1,5 @@
 import styles from "./home.module.scss"
-import { Header } from "components/Header"
+import { Header } from "components/layout"
 import { Footer } from "components/Footer"
 import { Circles } from "components/Circles"
 import { User, Peer } from "components/Users"
