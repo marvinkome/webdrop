@@ -92,15 +92,6 @@ export function dowloadUrl(url: string, name: string) {
     a.click()
 }
 
-export function fileSize(b?: number) {
-    if (!b) return false
-    let bytes = b * 1000
-
-    var exp = (Math.log(bytes) / Math.log(1024)) | 0
-    var result = (bytes / Math.pow(1024, exp)).toFixed(2)
-    return result + (exp == 0 ? "bytes" : "KMGTPEZY"[exp - 1])
-}
-
 export function chunkFile(file: File, onSplit: (e: ProgressEvent<FileReader>) => void) {
     const chunkSize = 16384
 

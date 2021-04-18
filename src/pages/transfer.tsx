@@ -3,13 +3,20 @@ import { Box, Heading, HStack, Text, Button } from "@chakra-ui/react"
 import { FilePicker } from "components/file-picker"
 import { IoCopyOutline } from "react-icons/io5"
 import { Layout } from "components/layout"
+import prettyBytes from "pretty-bytes"
+import { useTransfer } from "hooks/transfer"
 
-function FileInfo() {
+const FileInfo: React.FC<{ file: File; code: string }> = (props) => {
     return (
-        <Box maxW="md" mt={10} p={5} boxShadow="dark-lg" rounded="lg" bg="gray.700">
-            <Heading mb={2} align="left" fontWeight="500" fontSize="lg" isTruncated>
-                google_services.json (40mb)
-            </Heading>
+        <Box maxW="md" w={[350, 700]} mt={10} p={5} boxShadow="dark-lg" rounded="lg" bg="gray.700">
+            <Box align="left">
+                <Heading align="left" fontWeight="500" fontSize="lg" isTruncated>
+                    {props.file.name}
+                </Heading>
+                <Text mb={2} fontSize="sm">
+                    {prettyBytes(props.file.size)}
+                </Text>
+            </Box>
 
             <Text align="left" fontSize="sm">
                 Your file is ready to be transferred. To begin transfer, the receiving user have to
@@ -18,7 +25,7 @@ function FileInfo() {
 
             <Box my={6} align="left">
                 <Text fontWeight="600">Access Code</Text>
-                <Text letterSpacing={5}>345689</Text>
+                <Text letterSpacing={5}>{props.code}</Text>
             </Box>
 
             <HStack spacing={4}>
@@ -31,11 +38,15 @@ function FileInfo() {
 }
 
 export default function Transfer() {
-    const [file, setFile] = React.useState<File | null>(null)
+    const transferData = useTransfer()
 
     return (
         <Layout>
-            {file ? <FileInfo /> : <FilePicker onSelectFile={(file) => setFile(file)} />}
+            {transferData.file && transferData.peerId ? (
+                <FileInfo file={transferData.file} code={transferData.peerId} />
+            ) : (
+                <FilePicker onSelectFile={transferData.onSelectFile} />
+            )}
         </Layout>
     )
 }
