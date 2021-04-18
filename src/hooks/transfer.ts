@@ -1,6 +1,10 @@
 import Peer from "peerjs"
-import { useState, useEffect } from "react"
+import { customAlphabet } from "nanoid"
+import { useState, useEffect, useCallback } from "react"
 import { useToast } from "@chakra-ui/react"
+
+const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+const nanoid = customAlphabet(alphabet, 6)
 
 export function useTransfer() {
     const toast = useToast()
@@ -10,17 +14,14 @@ export function useTransfer() {
     // on mount set peer
     useEffect(() => {
         import("peerjs").then(({ default: PeerJS }) => {
-            const peer = new PeerJS({
-                ...(process.env.NODE_ENV !== "production"
-                    ? {
-                          debug: 3,
-                      }
-                    : {
-                          host: "/",
-                          path: "/api/peer",
-                      }),
-            })
+            const code = nanoid()
+            const options: any = {}
 
+            if (process.env.NODE_ENV !== "production") {
+                options.debug = 3
+            }
+
+            const peer = new PeerJS(code, options)
             setPeer(peer)
             console.log("Connection to peer server established")
         })

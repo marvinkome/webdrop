@@ -78,7 +78,7 @@ export const FilePicker: React.FC<{ onSelectFile: (file: File) => void }> = (pro
         }
     }, [files])
 
-    const onFileChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         e.stopPropagation()
         e.preventDefault()
 
@@ -86,7 +86,7 @@ export const FilePicker: React.FC<{ onSelectFile: (file: File) => void }> = (pro
         const file = files[0]
 
         props.onSelectFile(file)
-    }, [])
+    }
 
     return (
         <>
@@ -114,6 +114,8 @@ export const FilePicker: React.FC<{ onSelectFile: (file: File) => void }> = (pro
                     ref={dropRef}
                     mt={10}
                     p={5}
+                    w={[350, 600]}
+                    textAlign="center"
                     boxShadow="dark-lg"
                     rounded="2xl"
                     bg={dragging ? "gray.500" : "gray.700"}

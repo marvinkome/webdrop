@@ -29,14 +29,13 @@ export const Layout: React.FC = (props) => {
 
             <Flex
                 direction="column"
-                align="center"
+                alignItems="center"
                 bg={{ md: "blue.800" }}
-                textAlign="center"
                 rounded="2xl"
                 mt={14}
                 py={16}
             >
-                <VStack spacing={2}>
+                <VStack textAlign="center" spacing={2}>
                     <Box maxW="30rem">
                         <Heading fontWeight={{ base: "600", md: "500" }}>
                             File transfer to any device on the internet
