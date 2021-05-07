@@ -12,7 +12,7 @@ export const Layout: React.FC = (props) => {
                 <NextLink href="/">
                     <a>
                         <Heading fontSize="2xl" md={0}>
-                            WebDrop
+                            ADrop
                         </Heading>
                         <Text ml={1} fontSize="sm">
                             P2P data transfer

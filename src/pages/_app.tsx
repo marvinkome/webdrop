@@ -13,7 +13,7 @@ function MyApp({ Component, pageProps }: AppProps) {
                     rel="stylesheet"
                 />
 
-                <title>WebDrop</title>
+                <title>ADrop</title>
             </Head>
 
             <Component {...pageProps} />
