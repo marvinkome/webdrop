@@ -1,71 +1,111 @@
 import { dowloadUrl } from "utils"
 
-export class FileSplitter {
-    CHUNK_SIZE = 16384
+// I'm doing this because EventTarget doens't exist on server side
+export function fileSplitterCreator(file: File) {
+    if (typeof window === "undefined") return
 
-    offset: number = 0
-    fileReader = new FileReader()
-    file: File
+    class FileSplitter extends EventTarget {
+        CHUNK_SIZE = 16384
 
-    constructor(
-        file: File,
-        events: { onFileSplit: (res: any) => void; onOffsetUpdated: (newOffset: number) => void }
-    ) {
-        this.file = file
-        this.start(events)
-    }
+        offset: number = 0
+        fileReader = new FileReader()
+        file: File
 
-    readSlice = (offset: number) => {
-        console.log("[FileSplitter] readSlice: ", offset)
+        paused: boolean = false
 
-        const slice = this.file.slice(this.offset, offset + this.CHUNK_SIZE)
-        this.fileReader.readAsArrayBuffer(slice)
-    }
+        constructor(file: File) {
+            super()
 
-    start = (events: {
-        onFileSplit: (res: any) => void
-        onOffsetUpdated: (newOffset: number) => void
-    }) => {
-        this.readSlice(0)
+            this.file = file
 
-        this.fileReader.addEventListener("load", (e) => {
-            console.log("[read-file] FileRead.onload", e)
+            // add event listener for fileReader
+            this.fileReader.addEventListener("load", (e) => {
+                // console.log("[read-file] FileRead.onload", e)
+                this.dispatchEvent(
+                    new CustomEvent("split-file", {
+                        detail: { chunk: e.target?.result },
+                    })
+                )
 
-            events.onFileSplit(e.target?.result)
+                this.offset += (e.target?.result as ArrayBuffer).byteLength
+                this.dispatchEvent(
+                    new CustomEvent("update-offset", {
+                        detail: { offset: this.offset },
+                    })
+                )
 
-            this.offset += (e.target?.result as ArrayBuffer).byteLength
-            events.onOffsetUpdated(this.offset)
+                if (!this.paused && this.offset < this.file.size) {
+                    this.readSlice(this.offset)
+                }
+            })
+        }
 
-            if (this.offset < this.file.size) {
-                this.readSlice(this.offset)
-            }
-        })
-    }
-}
+        readSlice(offset: number) {
+            // console.log("[FileSplitter] readSlice: ", offset)
+            const slice = this.file.slice(this.offset, offset + this.CHUNK_SIZE)
+            this.fileReader.readAsArrayBuffer(slice)
+        }
 
-export class FileBuilder {
-    fileDetails: { fileName: string; fileSize: number }
+        start() {
+            this.readSlice(0)
+            this.dispatchEvent(new Event("start"))
+        }
 
-    chunks: ArrayBuffer[] = []
-    chunkSize: number = 0
+        pause() {
+            this.paused = true
+            this.dispatchEvent(new Event("pause"))
+        }
 
-    constructor(details: { fileName: string; fileSize: number }) {
-        this.fileDetails = details
-    }
+        resume() {
+            this.paused = false
+            this.dispatchEvent(new Event("resume"))
 
-    addChunk(chunk: ArrayBuffer, onAddChunk: (size: number) => void, onComplete: () => void) {
-        console.log("[FileBuilder.addChunk] receive buffer", chunk.byteLength)
-
-        this.chunkSize += chunk.byteLength
-        this.chunks.push(chunk)
-        onAddChunk(Math.floor((this.chunkSize / this.fileDetails.fileSize) * 100))
-
-        if (this.chunkSize >= this.fileDetails.fileSize) {
-            console.log("[FileBuilder] File ready for download")
-
-            const fileBlob = new Blob(this.chunks)
-            dowloadUrl(URL.createObjectURL(fileBlob), this.fileDetails.fileName)
-            onComplete()
+            // resume reading from file
+            this.readSlice(this.offset)
         }
     }
+
+    return new FileSplitter(file)
+}
+
+export function fileBuilderCreator(details: { fileName: string; fileSize: number }) {
+    if (typeof window === "undefined") return
+
+    class FileBuilder extends EventTarget {
+        fileDetails: { fileName: string; fileSize: number }
+
+        chunks: ArrayBuffer[] = []
+        chunkSize: number = 0
+
+        constructor(details: { fileName: string; fileSize: number }) {
+            super()
+            this.fileDetails = details
+        }
+
+        addChunk(chunk: ArrayBuffer) {
+            console.log("[FileBuilder.addChunk] receive buffer", chunk.byteLength)
+
+            this.chunkSize += chunk.byteLength
+            this.chunks.push(chunk)
+
+            this.dispatchEvent(
+                new CustomEvent("add-chunk", {
+                    detail: {
+                        chunkSize: Math.floor((this.chunkSize / this.fileDetails.fileSize) * 100),
+                    },
+                })
+            )
+
+            if (this.chunkSize >= this.fileDetails.fileSize) {
+                console.log("[FileBuilder] File ready for download")
+
+                const fileBlob = new Blob(this.chunks)
+                dowloadUrl(URL.createObjectURL(fileBlob), this.fileDetails.fileName)
+
+                this.dispatchEvent(new Event("complete"))
+            }
+        }
+    }
+
+    return new FileBuilder(details)
 }

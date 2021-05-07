@@ -1,21 +1,33 @@
-import Head from "next/head"
-import { ToastContainer } from "react-toastify"
-import { Home } from "containers/home"
+import React from "react"
+import { FilePicker } from "components/file-picker"
+import { Layout } from "components/layout"
+import { useTransferSetup, useFileTransfer } from "hooks/transfer"
+import { FileInfo } from "components/file-info"
+import { TransferDetails } from "components/transfer-details"
 
-import "react-toastify/dist/ReactToastify.css"
-import "react-circular-progressbar/dist/styles.css"
+export default function HomePage() {
+    const { file, peer, onSelectFile } = useTransferSetup()
+    const transferState = useFileTransfer(peer, file)
 
-export default function Index() {
-    return (
-        <main className="container">
-            <Head>
-                <title>Webdrop</title>
-                <link rel="icon" href="/favicon.ico" />
-            </Head>
+    let body = <FilePicker onSelectFile={onSelectFile} />
 
-            <Home />
+    if (file && peer) {
+        body = <FileInfo file={file} code={peer.id} />
+    }
 
-            <ToastContainer />
-        </main>
-    )
+    if (transferState.transferStarted && file) {
+        body = (
+            <TransferDetails
+                fileInfo={{ name: file.name, size: file.size }}
+                transferData={{
+                    started: transferState.transferStarted,
+                    completed: transferState.transferCompleted,
+                    transferredSize: transferState.transferedSize,
+                    bitrate: transferState.bitrate,
+                }}
+            />
+        )
+    }
+
+    return <Layout>{body}</Layout>
 }
