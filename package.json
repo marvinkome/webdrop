@@ -3,12 +3,9 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev-old": "nodemon",
         "dev": "next dev -p 8081",
-        "build:server": "tsc --project tsconfig.server.json",
-        "build:next": "next build",
-        "build": "npm run build:next && npm run build:server",
-        "start": "NODE_ENV=production node dist/src/server.js"
+        "build": "next build",
+        "start": "next start"
     },
     "dependencies": {
         "@chakra-ui/react": "^1.5.1",
