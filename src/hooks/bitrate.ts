@@ -25,7 +25,7 @@ export function useBitrate(sending: boolean) {
         const bytesNow = sending ? activeCandidatePair.bytesSent : activeCandidatePair.bytesReceived
         const bitrate = Math.round(
             ((bytesNow - bytesPrev.current) * 8) /
-                (activeCandidatePair.timestamp - timestampPrev.current)
+                ((activeCandidatePair.timestamp - timestampPrev.current) / 1000)
         )
 
         timestampPrev.current = activeCandidatePair.timestamp

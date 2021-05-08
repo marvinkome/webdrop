@@ -50,7 +50,7 @@ export const TransferDetails: React.FC<Props> = (props) => {
                             {props.transferData.transferredSize}%
                         </Text>
                         <Text fontWeight="500" fontSize="sm">
-                            {prettyBytes(props.transferData.bitrate || 0)}/s
+                            {prettyBytes(props.transferData.bitrate || 0, { bits: true })}/s
                         </Text>
                     </CircularProgressLabel>
                 </CircularProgress>

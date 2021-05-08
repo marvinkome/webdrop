@@ -1,7 +1,7 @@
 import { dowloadUrl } from "utils"
 
 // I'm doing this because EventTarget doens't exist on server side
-export function fileSplitterCreator(file: File) {
+export function fileSplitterCreator(file: File, chunkSize?: number) {
     if (typeof window === "undefined") return
 
     class FileSplitter extends EventTarget {
@@ -13,10 +13,13 @@ export function fileSplitterCreator(file: File) {
 
         paused: boolean = false
 
-        constructor(file: File) {
+        constructor(file: File, chunkSize?: number) {
             super()
 
             this.file = file
+            if (chunkSize && chunkSize !== 0) {
+                this.CHUNK_SIZE = chunkSize
+            }
 
             // add event listener for fileReader
             this.fileReader.addEventListener("load", (e) => {
@@ -65,7 +68,7 @@ export function fileSplitterCreator(file: File) {
         }
     }
 
-    return new FileSplitter(file)
+    return new FileSplitter(file, chunkSize)
 }
 
 export function fileBuilderCreator(details: { name: string; size: number; type: string }) {

@@ -15,6 +15,7 @@ export function useFileTransfer(peer?: Peer, file?: File) {
 
     function transferFile(dataConn: Peer.DataConnection) {
         if (!file) return
+        const chunkSize = dataConn.peerConnection.sctp?.maxMessageSize || 0
 
         // send file details to peer
         const fileDetails = JSON.stringify({
@@ -26,7 +27,7 @@ export function useFileTransfer(peer?: Peer, file?: File) {
         dataConn.send(fileDetails)
 
         // send file
-        fileSplitter.current = fileSplitterCreator(file)
+        fileSplitter.current = fileSplitterCreator(file, chunkSize)
         fileSplitter.current?.start()
 
         // add listeners
