@@ -11,7 +11,7 @@ export function useReceiveFile(dataConn?: Peer.DataConnection) {
     const [transferCompleted, setTransferCompleted] = useState(false)
     const [transferedSize, setTransferredSize] = useState(0)
 
-    const bitrateObj = useBitrate()
+    const bitrateObj = useBitrate(false)
     const fileBuilder = useRef<ReturnType<typeof fileBuilderCreator>>()
 
     function receiveFile(data: any) {
@@ -19,7 +19,7 @@ export function useReceiveFile(dataConn?: Peer.DataConnection) {
             console.log("[receiveFile] Receive file details", data)
             const parsedData = JSON.parse(data)
 
-            setFileInfo({ name: parsedData.fileName, size: parsedData.fileSize })
+            setFileInfo({ name: parsedData.name, size: parsedData.size })
 
             fileBuilder.current = fileBuilderCreator(parsedData)
             fileBuilder.current?.addEventListener("add-chunk", (e: any) => {

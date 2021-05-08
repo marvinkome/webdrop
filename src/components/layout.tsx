@@ -51,11 +51,11 @@ export const Layout: React.FC = (props) => {
                 </VStack>
 
                 {router.asPath === "/" ? (
-                    <NextLink href="/receive">
+                    <NextLink passHref href="/receive">
                         <Link fontSize="small">Receiving a file? Click here</Link>
                     </NextLink>
                 ) : (
-                    <NextLink href="/">
+                    <NextLink passHref href="/">
                         <Link fontSize="small">Want to send a file? Click here</Link>
                     </NextLink>
                 )}

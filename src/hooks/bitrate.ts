@@ -1,6 +1,6 @@
 import { useState, useRef } from "react"
 
-export function useBitrate() {
+export function useBitrate(sending: boolean) {
     const [bitrate, setBitrate] = useState(0)
 
     const statsInterval = useRef<any>()
@@ -22,7 +22,7 @@ export function useBitrate() {
         if (!activeCandidatePair) return
         if (timestampPrev.current === activeCandidatePair.timestamp) return
 
-        const bytesNow = activeCandidatePair.bytesReceived
+        const bytesNow = sending ? activeCandidatePair.bytesSent : activeCandidatePair.bytesReceived
         const bitrate = Math.round(
             ((bytesNow - bytesPrev.current) * 8) /
                 (activeCandidatePair.timestamp - timestampPrev.current)

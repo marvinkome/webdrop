@@ -68,42 +68,138 @@ export function fileSplitterCreator(file: File) {
     return new FileSplitter(file)
 }
 
-export function fileBuilderCreator(details: { fileName: string; fileSize: number }) {
+export function fileBuilderCreator(details: { name: string; size: number; type: string }) {
     if (typeof window === "undefined") return
 
     class FileBuilder extends EventTarget {
-        fileDetails: { fileName: string; fileSize: number }
+        fileDetails: { name: string; size: number; type: string }
 
-        chunks: ArrayBuffer[] = []
         chunkSize: number = 0
+        fs: any
+        fileEntry: any
 
-        constructor(details: { fileName: string; fileSize: number }) {
+        constructor(details: { name: string; size: number; type: string }) {
             super()
+
             this.fileDetails = details
+            this._requestFs().then(() => console.log("[FileBuilder]: File system setup - done."))
         }
 
         addChunk(chunk: ArrayBuffer) {
-            console.log("[FileBuilder.addChunk] receive buffer", chunk.byteLength)
+            const onError = (e: any) => console.log(this._errorHandler(e))
 
-            this.chunkSize += chunk.byteLength
-            this.chunks.push(chunk)
+            const onSuccess = (fileEntry: any) => {
+                this.fileEntry = fileEntry
+
+                fileEntry.createWriter((writer: any) => {
+                    const data = new Blob([chunk], { type: this.fileDetails.type })
+
+                    writer.onwriteend = () => this._onWrite(data.size)
+                    writer.onerror = function (error: any) {
+                        this._errorHandler(error)
+                        this.dispatchEvent(new Event("error"))
+                    }
+
+                    writer.seek(writer.length)
+                    writer.write(data)
+                }, onError)
+            }
+
+            this.fs.root.getFile(
+                this.fileDetails.name,
+                { create: !!!this.chunkSize },
+                onSuccess,
+                onError
+            )
+        }
+
+        saveFile() {
+            console.log("[FileBuilder] File ready for download")
+            let fileUrl
+
+            // @ts-ignore
+            if (window.webkitRequestFileSystem) {
+                fileUrl = this.fileEntry.toURL()
+            } else {
+                this.fileEntry.file((file: any) => {
+                    fileUrl = URL.createObjectURL(file)
+                })
+            }
+
+            dowloadUrl(fileUrl, this.fileDetails.name)
+            this.dispatchEvent(new Event("complete"))
+        }
+
+        _onWrite = (dataLength: number) => {
+            console.log("[FileBuilder.addChunk] write buffer", dataLength)
+
+            this.chunkSize += dataLength
 
             this.dispatchEvent(
                 new CustomEvent("add-chunk", {
                     detail: {
-                        chunkSize: Math.floor((this.chunkSize / this.fileDetails.fileSize) * 100),
+                        chunkSize: Math.floor((this.chunkSize / this.fileDetails.size) * 100),
                     },
                 })
             )
 
-            if (this.chunkSize >= this.fileDetails.fileSize) {
-                console.log("[FileBuilder] File ready for download")
-
-                const fileBlob = new Blob(this.chunks)
-                dowloadUrl(URL.createObjectURL(fileBlob), this.fileDetails.fileName)
-
-                this.dispatchEvent(new Event("complete"))
+            if (this.chunkSize >= this.fileDetails.size) {
+                this.saveFile()
             }
+        }
+
+        _requestFs = () => {
+            return new Promise((resolve: (fs: any) => void, reject) => {
+                // @ts-ignore
+                const requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem
+
+                requestFileSystem(
+                    // @ts-ignore
+                    window.TEMPORARY,
+                    this.fileDetails.size,
+                    (fs: any) => {
+                        this.fs = fs
+                        resolve(fs)
+                    },
+                    (e: any) => {
+                        this._errorHandler(e)
+                        reject(e)
+                    }
+                )
+            })
+        }
+
+        _errorHandler = (e: any) => {
+            let msg = ""
+
+            switch (e.code) {
+                // @ts-ignore
+                case FileError.QUOTA_EXCEEDED_ERR:
+                    msg = "QUOTA_EXCEEDED_ERR"
+                    break
+                // @ts-ignore
+                case FileError.NOT_FOUND_ERR:
+                    msg = "NOT_FOUND_ERR"
+                    break
+                // @ts-ignore
+                case FileError.SECURITY_ERR:
+                    msg = "SECURITY_ERR"
+                    break
+                // @ts-ignore
+                case FileError.INVALID_MODIFICATION_ERR:
+                    msg = "INVALID_MODIFICATION_ERR"
+                    break
+                // @ts-ignore
+                case FileError.INVALID_STATE_ERR:
+                    msg = "INVALID_STATE_ERR"
+                    break
+                default:
+                    msg = "Unknown Error"
+                    break
+            }
+
+            console.log("[FileSystem] Error: " + msg)
+            return msg
         }
     }
 

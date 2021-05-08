@@ -10,7 +10,7 @@ export function useFileTransfer(peer?: Peer, file?: File) {
     const [transferCompleted, setTransferCompleted] = useState(false)
     const [transferedSize, setTransferredSize] = useState(0)
 
-    const bitrateObj = useBitrate()
+    const bitrateObj = useBitrate(true)
     const fileSplitter = useRef<ReturnType<typeof fileSplitterCreator>>()
 
     function transferFile(dataConn: Peer.DataConnection) {
@@ -18,8 +18,9 @@ export function useFileTransfer(peer?: Peer, file?: File) {
 
         // send file details to peer
         const fileDetails = JSON.stringify({
-            fileName: file.name,
-            fileSize: file.size,
+            name: file.name,
+            size: file.size,
+            type: file.type,
         })
 
         dataConn.send(fileDetails)
