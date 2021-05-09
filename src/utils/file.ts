@@ -23,7 +23,6 @@ export function fileSplitterCreator(file: File, chunkSize?: number) {
 
             // add event listener for fileReader
             this.fileReader.addEventListener("load", (e) => {
-                // console.log("[read-file] FileRead.onload", e)
                 this.dispatchEvent(
                     new CustomEvent("split-file", {
                         detail: { chunk: e.target?.result },
@@ -44,7 +43,6 @@ export function fileSplitterCreator(file: File, chunkSize?: number) {
         }
 
         readSlice(offset: number) {
-            // console.log("[FileSplitter] readSlice: ", offset)
             const slice = this.file.slice(this.offset, offset + this.CHUNK_SIZE)
             this.fileReader.readAsArrayBuffer(slice)
         }
@@ -71,140 +69,126 @@ export function fileSplitterCreator(file: File, chunkSize?: number) {
     return new FileSplitter(file, chunkSize)
 }
 
-export function fileBuilderCreator(details: { name: string; size: number; type: string }) {
-    if (typeof window === "undefined") return
+export class FileBuilder {
+    fileDetails: { name: string; size: number; type: string }
 
-    class FileBuilder extends EventTarget {
-        fileDetails: { name: string; size: number; type: string }
+    chunkSize: number = 0
+    fs: any
+    fileEntry: any
 
-        chunkSize: number = 0
-        fs: any
-        fileEntry: any
+    onComplete?: () => void
+    onAddChunk?: (newSize: number) => void
+    onError?: () => void
 
-        constructor(details: { name: string; size: number; type: string }) {
-            super()
+    constructor(details: { name: string; size: number; type: string }) {
+        this.fileDetails = details
+        this._requestFs()
+    }
 
-            this.fileDetails = details
-            this._requestFs().then(() => console.log("[FileBuilder]: File system setup - done."))
+    addChunk(chunk: ArrayBuffer) {
+        const onError = (e: any) => console.log(this._errorHandler(e))
+
+        const onSuccess = (fileEntry: any) => {
+            this.fileEntry = fileEntry
+
+            fileEntry.createWriter((writer: any) => {
+                const data = new Blob([chunk], { type: this.fileDetails.type })
+
+                writer.onwriteend = () => this._onWrite(data.size)
+                writer.onerror = (error: any) => {
+                    this._errorHandler(error)
+                    this.onError && this.onError()
+                }
+
+                writer.seek(writer.length)
+                writer.write(data)
+            }, onError)
         }
 
-        addChunk(chunk: ArrayBuffer) {
-            const onError = (e: any) => console.log(this._errorHandler(e))
+        this.fs.root.getFile(
+            this.fileDetails.name,
+            { create: !!!this.chunkSize },
+            onSuccess,
+            onError
+        )
+    }
 
-            const onSuccess = (fileEntry: any) => {
-                this.fileEntry = fileEntry
+    saveFile() {
+        console.log("[FileBuilder] File ready for download")
+        let fileUrl
 
-                fileEntry.createWriter((writer: any) => {
-                    const data = new Blob([chunk], { type: this.fileDetails.type })
-
-                    writer.onwriteend = () => this._onWrite(data.size)
-                    writer.onerror = function (error: any) {
-                        this._errorHandler(error)
-                        this.dispatchEvent(new Event("error"))
-                    }
-
-                    writer.seek(writer.length)
-                    writer.write(data)
-                }, onError)
-            }
-
-            this.fs.root.getFile(
-                this.fileDetails.name,
-                { create: !!!this.chunkSize },
-                onSuccess,
-                onError
-            )
-        }
-
-        saveFile() {
-            console.log("[FileBuilder] File ready for download")
-            let fileUrl
-
-            // @ts-ignore
-            if (window.webkitRequestFileSystem) {
-                fileUrl = this.fileEntry.toURL()
-            } else {
-                this.fileEntry.file((file: any) => {
-                    fileUrl = URL.createObjectURL(file)
-                })
-            }
-
-            dowloadUrl(fileUrl, this.fileDetails.name)
-            this.dispatchEvent(new Event("complete"))
-        }
-
-        _onWrite = (dataLength: number) => {
-            console.log("[FileBuilder.addChunk] write buffer", dataLength)
-
-            this.chunkSize += dataLength
-
-            this.dispatchEvent(
-                new CustomEvent("add-chunk", {
-                    detail: {
-                        chunkSize: Math.floor((this.chunkSize / this.fileDetails.size) * 100),
-                    },
-                })
-            )
-
-            if (this.chunkSize >= this.fileDetails.size) {
-                this.saveFile()
-            }
-        }
-
-        _requestFs = () => {
-            return new Promise((resolve: (fs: any) => void, reject) => {
-                // @ts-ignore
-                const requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem
-
-                requestFileSystem(
-                    // @ts-ignore
-                    window.TEMPORARY,
-                    this.fileDetails.size,
-                    (fs: any) => {
-                        this.fs = fs
-                        resolve(fs)
-                    },
-                    (e: any) => {
-                        this._errorHandler(e)
-                        reject(e)
-                    }
-                )
+        // @ts-ignore
+        if (window.webkitRequestFileSystem) {
+            fileUrl = this.fileEntry.toURL()
+        } else {
+            this.fileEntry.file((file: any) => {
+                fileUrl = URL.createObjectURL(file)
             })
         }
 
-        _errorHandler = (e: any) => {
-            let msg = ""
+        dowloadUrl(fileUrl, this.fileDetails.name)
+        this.onComplete && this.onComplete()
+    }
 
-            switch (e.code) {
-                // @ts-ignore
-                case FileError.QUOTA_EXCEEDED_ERR:
-                    msg = "QUOTA_EXCEEDED_ERR"
-                    break
-                // @ts-ignore
-                case FileError.NOT_FOUND_ERR:
-                    msg = "NOT_FOUND_ERR"
-                    break
-                // @ts-ignore
-                case FileError.SECURITY_ERR:
-                    msg = "SECURITY_ERR"
-                    break
-                // @ts-ignore
-                case FileError.INVALID_MODIFICATION_ERR:
-                    msg = "INVALID_MODIFICATION_ERR"
-                    break
-                // @ts-ignore
-                case FileError.INVALID_STATE_ERR:
-                    msg = "INVALID_STATE_ERR"
-                    break
-                default:
-                    msg = "Unknown Error"
-                    break
-            }
+    _onWrite = (dataLength: number) => {
+        this.chunkSize += dataLength
 
-            console.log("[FileSystem] Error: " + msg)
-            return msg
+        const newSize = Math.floor((this.chunkSize / this.fileDetails.size) * 100)
+        this.onAddChunk && this.onAddChunk(newSize)
+
+        if (this.chunkSize >= this.fileDetails.size) {
+            this.saveFile()
         }
     }
 
-    return new FileBuilder(details)
+    _requestFs = () => {
+        // @ts-ignore
+        const requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem
+
+        const onInit = (fs: any) => {
+            this.fs = fs
+            console.log("[FileBuilder]: File system setup - done.")
+        }
+
+        requestFileSystem(
+            // @ts-ignore
+            window.TEMPORARY,
+            this.fileDetails.size,
+            onInit,
+            this._errorHandler
+        )
+    }
+
+    _errorHandler = (e: any) => {
+        let msg = ""
+
+        switch (e.code) {
+            // @ts-ignore
+            case FileError.QUOTA_EXCEEDED_ERR:
+                msg = "QUOTA_EXCEEDED_ERR"
+                break
+            // @ts-ignore
+            case FileError.NOT_FOUND_ERR:
+                msg = "NOT_FOUND_ERR"
+                break
+            // @ts-ignore
+            case FileError.SECURITY_ERR:
+                msg = "SECURITY_ERR"
+                break
+            // @ts-ignore
+            case FileError.INVALID_MODIFICATION_ERR:
+                msg = "INVALID_MODIFICATION_ERR"
+                break
+            // @ts-ignore
+            case FileError.INVALID_STATE_ERR:
+                msg = "INVALID_STATE_ERR"
+                break
+            default:
+                msg = "Unknown Error"
+                break
+        }
+
+        console.log("[FileSystem] Error: " + msg)
+        return msg
+    }
 }

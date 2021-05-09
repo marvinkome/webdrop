@@ -1,7 +1,7 @@
 import Peer from "peerjs"
 import React, { useState, useEffect, useRef } from "react"
 import { setupPeerJS } from "utils"
-import { fileBuilderCreator } from "utils/file"
+import { FileBuilder } from "utils/file"
 import { useBitrate } from "./bitrate"
 
 export function useReceiveFile(dataConn?: Peer.DataConnection) {
@@ -12,7 +12,7 @@ export function useReceiveFile(dataConn?: Peer.DataConnection) {
     const [transferedSize, setTransferredSize] = useState(0)
 
     const bitrateObj = useBitrate(false)
-    const fileBuilder = useRef<ReturnType<typeof fileBuilderCreator>>()
+    const fileBuilder = useRef<FileBuilder>()
 
     function receiveFile(data: any) {
         if (typeof data === "string") {
@@ -21,18 +21,18 @@ export function useReceiveFile(dataConn?: Peer.DataConnection) {
 
             setFileInfo({ name: parsedData.name, size: parsedData.size })
 
-            fileBuilder.current = fileBuilderCreator(parsedData)
-            fileBuilder.current?.addEventListener("add-chunk", (e: any) => {
-                setTransferredSize(e.detail.chunkSize)
-            })
+            fileBuilder.current = new FileBuilder(parsedData)
+            fileBuilder.current.onAddChunk = (newSize) => {
+                setTransferredSize(newSize)
+            }
 
-            fileBuilder.current?.addEventListener("complete", () => {
+            fileBuilder.current.onComplete = () => {
                 setTransferStarted(false)
                 setTransferCompleted(true)
 
                 bitrateObj.cancel()
                 dataConn?.close()
-            })
+            }
 
             return
         }
