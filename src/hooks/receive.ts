@@ -22,7 +22,6 @@ export function useReceiveFile(dataConn?: Peer.DataConnection) {
 
             if (parsedData.messageType === "text") {
                 setReceivedText(parsedData.content)
-                dataConn?.close()
                 return
             }
 

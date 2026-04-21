@@ -6,35 +6,44 @@ import { setupPeerJS } from "utils"
 import { useBitrate } from "./bitrate"
 
 export function useTextSetup() {
-    const [text, setText] = useState<string>()
     const [peer, setPeer] = useState<Peer>()
 
-    const onShareText = async (inputText: string) => {
+    const initSharing = async () => {
         const newPeer = await setupPeerJS()
-        setText(inputText)
         setPeer(newPeer)
     }
 
-    return { text, peer, onShareText }
+    return { peer, initSharing }
 }
 
 export function useTextTransfer(peer?: Peer, text?: string) {
-    const [textSent, setTextSent] = useState(false)
+    const [isConnected, setIsConnected] = useState(false)
+    const dataConnRef = useRef<Peer.DataConnection>()
 
     useEffect(() => {
-        if (!peer || !text) return
+        if (!peer) return
 
-        const onConnection = (dataConn: Peer.DataConnection) => {
-            dataConn.on("open", () => {
-                dataConn.send(JSON.stringify({ messageType: "text", content: text }))
-                setTextSent(true)
+        peer.on("connection", (dataConn) => {
+            dataConnRef.current = dataConn
+            dataConn.on("open", () => setIsConnected(true))
+            dataConn.on("close", () => {
+                setIsConnected(false)
+                dataConnRef.current = undefined
             })
-        }
+        })
+    }, [peer])
 
-        peer.on("connection", onConnection)
-    }, [peer, text])
+    useEffect(() => {
+        if (!isConnected || !dataConnRef.current || text === undefined) return
 
-    return { textSent }
+        const timeout = setTimeout(() => {
+            dataConnRef.current?.send(JSON.stringify({ messageType: "text", content: text }))
+        }, 300)
+
+        return () => clearTimeout(timeout)
+    }, [text, isConnected])
+
+    return { isConnected }
 }
 
 export function useFileTransfer(peer?: Peer, file?: File) {
