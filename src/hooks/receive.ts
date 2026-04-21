@@ -6,6 +6,7 @@ import { useBitrate } from "./bitrate"
 
 export function useReceiveFile(dataConn?: Peer.DataConnection) {
     const [fileInfo, setFileInfo] = useState<{ name: string; size: number }>()
+    const [receivedText, setReceivedText] = useState<string>()
 
     const [transferStarted, setTransferStarted] = useState(false)
     const [transferCompleted, setTransferCompleted] = useState(false)
@@ -18,6 +19,12 @@ export function useReceiveFile(dataConn?: Peer.DataConnection) {
         if (typeof data === "string") {
             console.log("[receiveFile] Receive file details", data)
             const parsedData = JSON.parse(data)
+
+            if (parsedData.messageType === "text") {
+                setReceivedText(parsedData.content)
+                dataConn?.close()
+                return
+            }
 
             setFileInfo({ name: parsedData.name, size: parsedData.size })
 
@@ -50,6 +57,7 @@ export function useReceiveFile(dataConn?: Peer.DataConnection) {
 
     return {
         fileInfo,
+        receivedText,
         transferCompleted,
         transferStarted,
         transferedSize,

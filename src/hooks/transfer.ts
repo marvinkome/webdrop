@@ -5,6 +5,38 @@ import { fileSplitterCreator } from "utils/file"
 import { setupPeerJS } from "utils"
 import { useBitrate } from "./bitrate"
 
+export function useTextSetup() {
+    const [text, setText] = useState<string>()
+    const [peer, setPeer] = useState<Peer>()
+
+    const onShareText = async (inputText: string) => {
+        const newPeer = await setupPeerJS()
+        setText(inputText)
+        setPeer(newPeer)
+    }
+
+    return { text, peer, onShareText }
+}
+
+export function useTextTransfer(peer?: Peer, text?: string) {
+    const [textSent, setTextSent] = useState(false)
+
+    useEffect(() => {
+        if (!peer || !text) return
+
+        const onConnection = (dataConn: Peer.DataConnection) => {
+            dataConn.on("open", () => {
+                dataConn.send(JSON.stringify({ messageType: "text", content: text }))
+                setTextSent(true)
+            })
+        }
+
+        peer.on("connection", onConnection)
+    }, [peer, text])
+
+    return { textSent }
+}
+
 export function useFileTransfer(peer?: Peer, file?: File) {
     const [transferStarted, setTransferStarted] = useState(false)
     const [transferCompleted, setTransferCompleted] = useState(false)
